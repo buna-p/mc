@@ -149,6 +149,11 @@ def process_row(row) -> dict:
     # column_14 = safe_str(row.get('column_14', '')) конт тлф
     column_15 = safe_str(row.get('column_15', ''))
     column_16 = safe_str(row.get('column_16', ''))
+
+    quantity = 1
+    contact_email = ''
+    delivery_email = ''
+
     if case_type == 'МК.Новое включение Лендинг промо':
         quantity = extract_quantity(column_1)
         gorod_podkl, gorod_podkl_error = extract_city(column_16)
