@@ -128,19 +128,16 @@ def main():
     result['ВидДокумента'] = 'Паспорт гражданина РФ'
     result['СтранаРГ'] = 'Россия'
     result['СтранаПР'] = 'Россия'
-    result = result[OUTPUT_COLUMNS]
     repeats = pd.to_numeric(result['КОЛ_ВО'], errors='coerce')
-    repeats = repeats.fillna(1)
-    repeats = repeats.astype(int)
-    repeats = repeats.clip(lower=1)
+    repeats = repeats.fillna(1).astype(int).clip(lower=1)
     result = result.loc[result.index.repeat(repeats)].reset_index(drop=True)
-    print(f"Строк после размножения: {len(result)}")
+    stats = result['СТАТУС'].value_counts().to_string()
+    result = result[OUTPUT_COLUMNS]
     try:
         result.to_excel(dst, index=False)
     except Exception as e:
         error(f'Не удалось сохранить файл:\n{e}')
         sys.exit()
-    stats = result['СТАТУС'].value_counts().to_string()
     info(
         f'Обработано строк: {len(result)}\n\n'
         f'Статистика статусов:\n{stats}'
