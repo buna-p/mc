@@ -153,6 +153,7 @@ def process_row(row) -> dict:
     quantity = 1
     contact_email = ''
     delivery_email = ''
+    gorod_podkl = ''
 
     if case_type == 'МК.Новое включение Лендинг промо':
         quantity = extract_quantity(column_1)
