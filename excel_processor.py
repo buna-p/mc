@@ -157,7 +157,7 @@ def process_row(row) -> dict:
         email_prefix = 'E_mail_str: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = ''
-    if case_type == 'МК.MNP. Нет временного номера':
+    elif case_type == 'МК.MNP. Нет временного номера':
         quantity = 1
         gorod_podkl, gorod_podkl_error = extract_city(column_15)
         if gorod_podkl_error:
