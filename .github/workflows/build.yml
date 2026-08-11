@@ -1,0 +1,33 @@
+name: Build ExcelProcessor.exe
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:    # <-- позволяет запускать вручную кнопкой
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Скачать код
+        uses: actions/checkout@v4
+
+      - name: Установить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости
+        run: |
+          pip install pandas openpyxl pyinstaller
+
+      - name: Собрать .exe
+        run: |
+          pyinstaller --onefile --windowed --name "ExcelProcessor" --add-data "file_utils.py;." --add-data "excel_processor.py;." --add-data "address_parser.py;." --hidden-import pandas --hidden-import openpyxl main.py
+
+      - name: Выложить .exe как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExcelProcessor
+          path: dist\ExcelProcessor.exe
