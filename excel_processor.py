@@ -1,5 +1,6 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
 
 from address_parser import parse_address
 
@@ -10,6 +11,14 @@ def safe_str(val) -> str:
     if isinstance(val, float) and val != val:
         return ''
     return str(val).strip().upper()
+
+
+def safe_str_email(val) -> str:
+    if val is None:
+        return ''
+    if isinstance(val, float) and val != val:
+        return ''
+    return str(val).strip()
 
 
 def del_prefix(data: str, prefix: str) -> str:
@@ -26,15 +35,24 @@ def format_date(val: str) -> str:
         return ''
 
 
+def _parse_date(val: str) -> date | None:
+    try:
+        return datetime.strptime(val[:10], '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
 def extract_fio(data: str) -> tuple[str, str, str, str]:
     data = del_prefix(data, 'ФИО_str: ')
     patronymics = ["ОГЛЫ", "ОГЛУ", "УУЛУ", "УЛЫ", "КЫЗЫ", "КЫЗЫСЫ", "ГЫЗЫ",]
     if not data:
         return '', '', '', 'ФИО: ПУСТО'
+    if re.search(r'[A-Z]', data):
+        return data, '', '', 'ФИО: ЛАТИНИЦА'
     parts = [p for p in data.split() if p]
     if len(parts) > 3:
         if parts[3] in patronymics:
-            return parts[0], parts[1], parts[2] + parts[3], ''
+            return parts[0], parts[1], parts[2] + ' ' + parts[3], ''
         return data, '', '', 'ФИО: НЕ РАСПОЗНАНЫ'
     elif len(parts) == 3:
         return parts[0], parts[1], parts[2], ''
@@ -62,6 +80,12 @@ def extract_passport_date(data: str) -> tuple[str, str]:
     passport_date = format_date(passport_date)
     if not passport_date:
         return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: НЕ РАСПОЗНАНА'
+    parsed = _parse_date(passport_date)
+    if parsed > date.today():
+        return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: НЕ РАСПОЗНАНА'
+    thirty_years_ago = date.today() - relativedelta(years=30)
+    if parsed <= thirty_years_ago:
+        return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: БОЛЬШЕ 30 ЛЕТ'
     return passport_date, ''
 
 
@@ -79,6 +103,8 @@ def extract_issued_by(data: str) -> tuple[str, str]:
     issued_by = del_prefix(data, 'Кем_выдан_str: ')
     if not issued_by:
         return '', 'КЕМ ВЫДАН: ПУСТО'
+    if re.search(r'[A-Z]', issued_by):
+        return issued_by, 'КЕМ ВЫДАН: ЛАТИНИЦА'
     return issued_by, ''
 
 
@@ -89,6 +115,15 @@ def extract_birth_date(data: str) -> tuple[str, str]:
     birth_date = format_date(birth_date)
     if not birth_date:
         return data, 'ДР: НЕ РАСПОЗНАНА'
+    parsed = _parse_date(birth_date)
+    if parsed >= date.today():
+        return data, 'ДР: НЕ РАСПОЗНАНА'
+    sixteen_years_ago = date.today() - relativedelta(years=16)
+    if parsed > sixteen_years_ago:
+        return data, 'ДР: МЕНЬШЕ 16 ЛЕТ'
+    one_hundred_years_ago = date.today() - relativedelta(years=100)
+    if parsed <= one_hundred_years_ago:
+        return data, 'ДР: БОЛЬШЕ 100 ЛЕТ'
     return birth_date, ''
 
 
@@ -96,6 +131,8 @@ def extract_place_of_birth(data: str) -> tuple[str, str]:
     place_of_birth = del_prefix(data, 'Место_рождения_str: ')
     if not place_of_birth:
         return '', 'МЕСТО РОЖДЕНИЯ: ПУСТО'
+    if re.search(r'[A-Z]', place_of_birth):
+        return place_of_birth, 'МЕСТО РОЖДЕНИЯ: ЛАТИНИЦА'
     return place_of_birth, ''
 
 
@@ -145,7 +182,7 @@ def process_row(row) -> dict:
     column_8 = safe_str(row.get('column_8', ''))  # место рождения
     column_9 = safe_str(row.get('column_9', ''))  # адрес регистрации
     column_10 = safe_str(row.get('column_10', ''))  # пол
-    column_13 = safe_str(row.get('column_13', ''))
+    column_13 = safe_str_email(row.get('column_13', ''))  #email
     # column_14 = safe_str(row.get('column_14', '')) конт тлф
     column_15 = safe_str(row.get('column_15', ''))
     column_16 = safe_str(row.get('column_16', ''))
