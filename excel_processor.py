@@ -39,7 +39,7 @@ def _parse_date(val: str) -> date | None:
     try:
         return datetime.strptime(val[:10], '%Y-%m-%d').date()
     except ValueError:
-        return None
+        return date.today()
 
 
 def extract_fio(data: str) -> tuple[str, str, str, str]:
