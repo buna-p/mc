@@ -4,8 +4,8 @@ from dataclasses import asdict, dataclass
 
 @dataclass
 class AddressResult:
-    source: str #исходник
-    normalized: str #нормализованные данные
+    source: str  # исходник
+    normalized: str  # нормализованные данные
     country: str = "РОССИЯ"
     postal_code: str = ''
     region: str = ''
@@ -14,13 +14,13 @@ class AddressResult:
     house: str = ''
     building: str = ''
     apartment: str = ''
-    status: str = 'GOOD' #GOOD/WARNING/BAD/ERROR
+    status: str = 'GOOD'  # GOOD/WARNING/BAD/ERROR
     comment: str = ''
 
 
 ADDRESS_PREFIX = 'Адрес_регистрации_str: '
 
-NUMBER_PATTERN = r'\d+[А-ЯA-Z]?(?:[/\-]\d+[А-ЯA-Z]?)?' #паттерн для определения номера в адресе (дом, корп, кв)
+NUMBER_PATTERN = r'\d+[А-ЯA-Z]?(?:[/\-]\d+[А-ЯA-Z]?)?'  # паттерн для определения номера в адресе (дом, корп, кв)
 
 COUNTRY_VALUES = frozenset({'РОССИЯ', 'РФ', 'РОССИЙСКАЯ ФЕДЕРАЦИЯ', 'РОС ФЕД', 'РОСИЯ'})
 
@@ -39,7 +39,7 @@ SETTLEMENT_MARKERS = (
     r'ПГТ|П\.\s*Г\.\s*Т\.?|'
     r'СТАНИЦА|СТ-ЦА|СТ\.?|'
     r'ХУТОР|ХУТ\.?|Х\.?|'
-    r'Д\.?'                    # деревня — последним (конфликтует с домом)
+    r'Д\.?'  # деревня — последним (конфликтует с домом)
 )
 
 STREET_MARKERS = (
@@ -100,7 +100,7 @@ SETTLEMENT_SHORT = {
 def normalize_address(data: str) -> str:
     if not isinstance(data, str):
         return ''
-    
+
     address = data.removeprefix(ADDRESS_PREFIX)
     address = address.strip().upper().replace('Ё', 'Е')
     address = re.sub(r'\s+', ' ', address)
@@ -110,6 +110,12 @@ def normalize_address(data: str) -> str:
     address = re.sub(r'\.(?=[А-ЯA-Z0-9])', '. ', address)
     address = re.sub(r'\s+', ' ', address)
     return address.strip(',. ')
+
+
+'''def check_latin(data: str, field_name: str) -> str:
+    if re.search(r'[A-Z]', data):
+        return f'{field_name}: СОДЕРЖИТ ЛАТИНИЦУ — ВОЗМОЖЕН ВВОД НА АНГЛИЙСКОЙ РАСКЛАДКЕ'
+    return data'''
 
 
 def split_address(address: str) -> list[str]:
@@ -184,25 +190,27 @@ def extract_settlement(address: str) -> str | None:
 
 def extract_region(address: str) -> str | None:
     flat = '|'.join(re.escape(marker.rstrip('.')) for marker in REGION_MARKERS)
+    all_after = SETTLEMENT_MARKERS + '|' + STREET_MARKERS + '|' + HOUSE_MARKERS
     for part in split_address(address):
         for marker in REGION_MARKERS:
             if re.search(rf"\b{re.escape(marker.rstrip('.'))}\.?\b", part):
-                return clean_name(part)
+                region_only = re.split(
+                    rf'\s+(?:{all_after})\s+',
+                    part,
+                    maxsplit=1
+                )[0]
+                return clean_name(region_only)
     match = re.search(
-        r'[А-ЯA-Z][А-ЯA-Z\- ]*?\s*(?:' + flat + r')\.?\b',
+        r'[А-Я][А-Я\- ]*?\s*(?:' + flat + r')\.?\b',
         address,
-        re.IGNORECASE,
     )
     if match:
         return clean_name(match.group())
     match = re.search(
-        r'\b(?:' + flat + r')\.?\s+[А-ЯA-Z][А-ЯA-Z\-]+'
-        r'(?:\s+[А-ЯA-Z][А-ЯA-Z\-]+)*'
-        r'(?=\s*,|\s+(?:' 
-        + SETTLEMENT_MARKERS + r'|' + STREET_MARKERS + r'|' + HOUSE_MARKERS
-        + r')\b|$)',
+        r'\b(?:' + flat + r')\.?\s+[А-Я][А-Я\-]+'
+        r'(?:\s+[А-Я][А-Я\-]+)*'
+        r'(?=\s*,|\s+(?:' + all_after + r')\b|$)',
         address,
-        re.IGNORECASE,
     )
     return clean_name(match.group()) if match else None
 
@@ -383,18 +391,16 @@ def resolve_building_vs_apartment(
     return building, apartment, changed
 
 
-
-
 def parse_address(address: str) -> dict:
     if not isinstance(address, str) or not address.strip():
         result = AddressResult(
             source='' if address is None else str(address),
             normalized='',
             status='ERROR',
-            comment='АДРЕС ПУСТ ИЛИ ИМЕЕТ НЕКОРРЕКТНЫЙ ТИП',
+            comment='АДРЕС: ПУСТО ИЛИ ИМЕЕТ НЕКОРРЕКТНЫЙ ТИП',
         )
         return asdict(result)
-    
+
     normalized = normalize_address(address)
     used_assumption = False
 
@@ -481,7 +487,7 @@ def parse_address(address: str) -> dict:
 if __name__ == "__main__":
     test_addresses = [
         # Полные с запятыми
-        "142703, Россия, Московская Обл, г Видное, мкр Солнечный, д. 4, кв. 36",
+        "142703, Россия, Московская Обл г Видное, мкр Солнечный, д. 4, кв. 36",
         "344116, обл. Ростовская, г. Ростов-на-Дону, пер. Салютина, дом 2, квартира 237",
         "460004, г Оренбург, ул.Ткачева,дом 91,кв.22",
         "115407, Москва, Затонная улица, д.5, к.1, кв.9",
