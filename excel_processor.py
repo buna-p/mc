@@ -28,6 +28,13 @@ def del_prefix(data: str, prefix: str) -> str:
     return data
 
 
+def del_prefix_email(data: str, prefix: str) -> str:
+    data = data.strip()
+    data = data.removeprefix(prefix)
+    data = data.strip()
+    return data
+
+
 def format_date(val: str) -> str:
     try:
         return datetime.strptime(val[:10], '%Y-%m-%d').strftime('%d.%m.%Y')
@@ -155,7 +162,7 @@ def extract_quantity(data: str) -> str:
 
 
 def extract_email(data: str, email_prefix: str) -> str:
-    email = del_prefix(data, email_prefix)
+    email = del_prefix_email(data, email_prefix)
     if not email:
         return ''
     return email
@@ -197,7 +204,7 @@ def process_row(row) -> dict:
         gorod_podkl, gorod_podkl_error = extract_city(column_16)
         if gorod_podkl_error:
             errors.append(gorod_podkl_error)
-        email_prefix = 'E_MAIL_STR: '
+        email_prefix = 'E_mail_str: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = ''
     elif case_type == 'МК.MNP. НЕТ ВРЕМЕННОГО НОМЕРА':
@@ -205,7 +212,7 @@ def process_row(row) -> dict:
         gorod_podkl, gorod_podkl_error = extract_city(column_15)
         if gorod_podkl_error:
             errors.append(gorod_podkl_error)
-        email_prefix = 'КОНТАКТНЫЙ_E_MAIL_CRQ453539_STR: '
+        email_prefix = 'Контактный_e_mail_CRQ453539_str: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = extract_email(column_13, email_prefix)
     surname, name, patronymic, fio_error = extract_fio(column_2)
