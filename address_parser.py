@@ -167,12 +167,12 @@ def _normalize_street_marker(marker: str) -> str:
     return mapping.get(marker, marker)
 
 
-def extract_settlement(address: str) -> str | None:
+'''def extract_settlement(address: str) -> str | None:
     match = re.search(
         r'(?:^|,\s*|\s)'
         r'(?P<marker>' + SETTLEMENT_MARKERS + r')'
         r'\s+'
-        r'(?P<name>[А-ЯA-Z][А-ЯA-Z0-9\- ]*?)'
+        r'(?P<name>[А-Я][А-Я0-9\- ]*?)'
         r'(?=\s*,|\s+(?:' + STREET_MARKERS + r'|ДОМ\.?|ДОМОВЛАДЕНИЕ|ДВЛД\.?|Д\.?)\s*\d|$)',
         address,
         )
@@ -185,7 +185,35 @@ def extract_settlement(address: str) -> str | None:
     if re.fullmatch(r'Д\.?', marker, re.IGNORECASE) and re.fullmatch(r'"\d+.*', name):
         return None
     normalized_marker = _normalize_settlement_marker(marker)
-    return f'{normalized_marker} {name}'
+    return f'{normalized_marker} {name}'''
+
+
+def extract_settlement(address: str) -> str | None:
+    split_on = STREET_MARKERS + '|' + HOUSE_MARKERS
+
+    for part in split_address(address):
+        match = re.search(
+            r'(?P<marker>' + SETTLEMENT_MARKERS + r')\s+',
+            part,
+        )
+        if not match:
+            continue
+
+        marker = match.group('marker').strip()
+        after_marker = part[match.end():]
+
+        name = re.split(r'\s+(?:' + split_on + r')\s+', after_marker, maxsplit=1)[0]
+        name = clean_name(name)
+
+        if not name:
+            continue
+        if re.fullmatch(r'Д\.?', marker, re.IGNORECASE) and re.fullmatch(r'"\d+.*', name):
+            continue
+
+        normalized_marker = _normalize_settlement_marker(marker)
+        return f'{normalized_marker} {name}'
+
+    return None
 
 
 def extract_region(address: str) -> str | None:
