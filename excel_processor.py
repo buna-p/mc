@@ -121,7 +121,7 @@ def extract_birth_date(data: str) -> tuple[str, str]:
         return '', 'ДР: ПУСТО'
     parsed = _parse_date(birth_date)
     if parsed >= date.today():
-        return data, 'ДР: НЕ РАСПОЗНАНА'
+        return birth_date, 'ДР: НЕ РАСПОЗНАНА'
     sixteen_years_ago = date.today() - relativedelta(years=16)
     if parsed > sixteen_years_ago:
         return birth_date, 'ДР: МЕНЬШЕ 16 ЛЕТ'
