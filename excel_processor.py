@@ -197,7 +197,7 @@ def process_row(row) -> dict:
         gorod_podkl, gorod_podkl_error = extract_city(column_16)
         if gorod_podkl_error:
             errors.append(gorod_podkl_error)
-        email_prefix = 'E_mail_str: '
+        email_prefix = 'E_MAIL_STR: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = ''
     elif case_type == 'МК.MNP. НЕТ ВРЕМЕННОГО НОМЕРА':
@@ -205,7 +205,7 @@ def process_row(row) -> dict:
         gorod_podkl, gorod_podkl_error = extract_city(column_15)
         if gorod_podkl_error:
             errors.append(gorod_podkl_error)
-        email_prefix = 'Контактный_e_mail_CRQ453539_str: '
+        email_prefix = 'КОНТАКТНЫЙ_E_MAIL_CRQ453539_STR: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = extract_email(column_13, email_prefix)
     surname, name, patronymic, fio_error = extract_fio(column_2)
