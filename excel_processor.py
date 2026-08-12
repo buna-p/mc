@@ -77,15 +77,15 @@ def extract_passport_date(data: str) -> tuple[str, str]:
     passport_date = del_prefix(data, 'Data_vydachi_pasporta_str: ')
     if not passport_date:
         return '', 'ДАТА ВЫДАЧИ ПАСПОРТА: ПУСТО'
-    passport_date = format_date(passport_date)
-    if not passport_date:
-        return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: НЕ РАСПОЗНАНА'
     parsed = _parse_date(passport_date)
     if parsed > date.today():
         return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: НЕ РАСПОЗНАНА'
     thirty_years_ago = date.today() - relativedelta(years=30)
     if parsed <= thirty_years_ago:
         return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: БОЛЬШЕ 30 ЛЕТ'
+    passport_date = format_date(passport_date)
+    if not passport_date:
+        return data, 'ДАТА ВЫДАЧИ ПАСПОРТА: НЕ РАСПОЗНАНА'
     return passport_date, ''
 
 
@@ -112,9 +112,6 @@ def extract_birth_date(data: str) -> tuple[str, str]:
     birth_date = del_prefix(data, 'Дата_рождения_date: ')
     if not birth_date:
         return '', 'ДР: ПУСТО'
-    birth_date = format_date(birth_date)
-    if not birth_date:
-        return data, 'ДР: НЕ РАСПОЗНАНА'
     parsed = _parse_date(birth_date)
     if parsed >= date.today():
         return data, 'ДР: НЕ РАСПОЗНАНА'
@@ -124,6 +121,9 @@ def extract_birth_date(data: str) -> tuple[str, str]:
     one_hundred_years_ago = date.today() - relativedelta(years=100)
     if parsed <= one_hundred_years_ago:
         return data, 'ДР: БОЛЬШЕ 100 ЛЕТ'
+    birth_date = format_date(birth_date)
+    if not birth_date:
+        return data, 'ДР: НЕ РАСПОЗНАНА'
     return birth_date, ''
 
 
