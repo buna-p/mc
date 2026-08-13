@@ -249,9 +249,9 @@ def process_row(row) -> dict:
         address_warning = f'АДРЕС: {address_comments}'
     all_notes = []
     if errors:
-        all_notes.append(f'ERROR: {"; ".join(errors)}')
+        all_notes.append(f'{"; ".join(errors)}')
     if address_warning:
-        all_notes.append(f'WARNING: {address_warning}')
+        all_notes.append(f'{address_warning}')
     return {
         'КОЛ_ВО': quantity,
         'Комментарий': CASE_ID,
