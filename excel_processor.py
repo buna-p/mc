@@ -242,8 +242,16 @@ def process_row(row) -> dict:
     parsed_address = parse_address(column_9)
     address_status = parsed_address.get('status', 'ERROR')
     address_comments = parsed_address.get('comment', '')
-    if address_status in ('WARNING', 'ERROR'):
+    address_warning = ''
+    if address_status == 'ERROR':
         errors.append(f'АДРЕС: {address_comments}')
+    elif address_status == 'WARNING':
+        address_warning = f'АДРЕС: {address_comments}'
+    all_notes = []
+    if errors:
+        all_notes.append(f'ERROR: {"; ".join(errors)}')
+    if address_warning:
+        all_notes.append(f'WARNING: {address_warning}')
     return {
         'КОЛ_ВО': quantity,
         'Комментарий': CASE_ID,
@@ -274,5 +282,5 @@ def process_row(row) -> dict:
         'Email (ДляКонтактов)': contact_email,
         'Email (ДляДоставкиСчетов)': delivery_email,
         'СТАТУС': 'ERROR' if errors else address_status,
-        'ОШИБКИ': '; '.join(errors),
+        'КОММЕНТАРИИ': ' | '.join(all_notes) if all_notes else '',
     }

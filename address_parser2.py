@@ -85,7 +85,7 @@ def normalize_address(data: str) -> str:
         return ''
     all_markers = HOUSE_MARKERS + BUILDING_MARKERS + APARTMENT_MARKERS
     markers = '|'.join(sorted(all_markers, key=len, reverse=True))
-    address = data.removeprefix('Адрес_регистрации_str: ')
+    address = data.removeprefix('Адрес_регистрации_str: '.upper())
     address = address.strip().upper().replace('Ё', 'Е')
     address = re.sub(r'\s+', ' ', address)
     address = re.sub(r'\s*,\s*', ', ', address)
@@ -265,7 +265,7 @@ def parse_address(address: str) -> dict:
         result = AddressResult(
             source='' if address is None else str(address),
             status='ERROR',
-            comment='АДРЕС: ПУСТО ИЛИ НЕКОРРЕКТНЫЙ',
+            comment='ПУСТО ИЛИ НЕКОРРЕКТНЫЙ',
         )
         return asdict(result)
 
@@ -275,7 +275,7 @@ def parse_address(address: str) -> dict:
 
     if check_latin(normalized):
         used_WARNING = True
-        comment_WARNING.append('АДРЕС: ЛАТИНИЦА')
+        comment_WARNING.append('ЛАТИНИЦА')
 
     postal_code = extract_postal_code(normalized) or ''
     city = extract_city(normalized)
@@ -287,7 +287,7 @@ def parse_address(address: str) -> dict:
         city = extract_city_by_list(normalized)
     if street and re.search(rf'{re.escape(street)}\s+\d', normalized):
         used_WARNING = True
-        comment_WARNING.append('АДРЕС: УЛИЦА И ДОМ ОПРЕДЕЛЕНЫ ЭВРИСТИЧЕСКИ')
+        comment_WARNING.append('УЛИЦА И ДОМ ОПРЕДЕЛЕНЫ ЭВРИСТИЧЕСКИ')
 
     missing = []
     if not city:
@@ -307,7 +307,7 @@ def parse_address(address: str) -> dict:
         comment = 'АДРЕС: НЕ РАСПОЗНАН'
     elif used_WARNING:
         status = 'WARNING'
-        comment = {"; ".join(comment_WARNING)}
+        comment = '; '.join(comment_WARNING)
     else:
         status = 'GOOD'
         comment = ''
