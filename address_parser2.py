@@ -202,7 +202,7 @@ def extract_street(address: str) -> str | None:
 def check_street(street: str) -> str | None:
     if street in STREET_MARKERS_SET:
         return None
-    if len(street.split()) >= 5:
+    if len(street.split()) > 3:
         return None
     if street and '/' in street:
         return None
