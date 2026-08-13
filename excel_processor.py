@@ -2,7 +2,7 @@ import re
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
-from address_parser import parse_address
+from address_parser2 import parse_address
 
 
 def safe_str(val) -> str:
