@@ -242,9 +242,8 @@ def process_row(row) -> dict:
     parsed_address = parse_address(column_9)
     address_status = parsed_address.get('status', 'ERROR')
     address_comments = parsed_address.get('comment', '')
-    if address_status in ('MANUAL', 'ERROR'):
-        errors.append(f'АДРЕС: {address_comments}' if address_comments
-                      else f'АДРЕС: {address_status}')
+    if address_status in ('WARNING', 'ERROR'):
+        errors.append(f'АДРЕС: {address_comments}')
     return {
         'КОЛ_ВО': quantity,
         'Комментарий': CASE_ID,
