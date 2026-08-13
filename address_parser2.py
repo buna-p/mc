@@ -161,6 +161,16 @@ def extract_city_by_list(address: str) -> str | None:
     return None
 
 
+def check_street(street: str) -> str | None:
+    if street in STREET_MARKERS_SET:
+        return None
+    if len(street.split()) > 3:
+        return None
+    if street and '/' in street:
+        return None
+    return street
+
+
 def extract_street(address: str) -> str | None:
     markers = '|'.join(STREET_MARKERS)
     markers_after = '|'.join(HOUSE_MARKERS + BUILDING_MARKERS + APARTMENT_MARKERS)
@@ -197,16 +207,6 @@ def extract_street(address: str) -> str | None:
         result = clean_name(match.group())
         return result if check_street(result) else None
     return None
-
-
-def check_street(street: str) -> str | None:
-    if street in STREET_MARKERS_SET:
-        return None
-    if len(street.split()) > 3:
-        return None
-    if street and '/' in street:
-        return None
-    return street
 
 
 def extract_house(address: str) -> str | None:
@@ -275,6 +275,8 @@ def extract_apartment(address: str) -> str | None:
             if match:
                 tail = part[match.start():]
                 if re.search(r'\d[А-Я]{3,}', tail):
+                    return 'ERROR'
+                if len(tail.split() > 2):
                     return 'ERROR'
                 return clean_name(tail)
     match = re.search(
