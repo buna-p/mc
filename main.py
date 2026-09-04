@@ -6,7 +6,7 @@ from excel_processor import process_row
 from file_utils import error, info, select_input_file, select_output_catalog
 
 NEEDED_COLUMNS = [
-    'CASE_ID', 'Case_Type_3', 'ИНН', 'column_1', 'column_2', 'column_3',
+    'CASE_ID', 'Case_Type3', 'INN', 'column_1', 'column_2', 'column_3',
     'column_4', 'column_5', 'column_6', 'column_7', 'column_8', 'column_9',
     'column_10', 'column_13', 'column_15', 'column_16'
 ]
