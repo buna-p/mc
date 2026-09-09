@@ -66,7 +66,7 @@ def main():
     try:
         df = pd.read_excel(src)
     except Exception as e:
-        error('Ошибка', f'Не удалось прочитать файл:\n{e}')
+        error(f'Не удалось прочитать файл:\n{e}')
         sys.exit()
     payer_file_path = select_payer_file()
     reference_dict = None
