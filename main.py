@@ -3,7 +3,8 @@ import sys
 import pandas as pd
 
 from excel_processor import process_row
-from file_utils import error, info, select_input_file, select_output_catalog
+from file_utils import error, info, select_input_file, select_output_catalog, select_payer_file
+from payer_utils import build_reference_dict
 
 NEEDED_COLUMNS = [
     'CASE_ID', 'Case_Type3', 'INN', 'column_1', 'column_2', 'column_3',
@@ -58,6 +59,14 @@ def main():
     if not src:
         error('Исходный файл не выбран либо некорректный, программа завершена')
         sys.exit()
+    payer_file_path = select_payer_file()
+    reference_dict = None
+    if payer_file_path:
+        try:
+            ref_df = pd.read_excel(payer_file_path)
+            reference_dict = build_reference_dict(ref_df)
+        except Exception as e:
+            error('Не удалось загрузить справочник Payer BAN.\n\nПрограмма продолжит работу без справочника.')
     dst = select_output_catalog()
     if not dst:
         error('Сохранение прервано, программа завершена')
@@ -72,8 +81,9 @@ def main():
         error(f'Не найдены колонки:\n{missing}\n\n, программа завершена')
         sys.exit()
     df = df[NEEDED_COLUMNS].copy()
+    ref = reference_dict
     result = df.apply(
-        lambda row: pd.Series(process_row(row.to_dict())),
+        lambda row: pd.Series(process_row(row.to_dict(), reference=ref)),
         axis=1,
     )
     for col in ['Проверка предоставляемых мною данных',
@@ -86,7 +96,7 @@ def main():
                 ]:
         result[col] = 'Да'
     for col in ['Наименование клиента', 'ИНН/КИО', 'Есть миграционная карта',
-                'Название не миграционной карты', 'Payer BAN', 'Целевой тариф',
+                'Название не миграционной карты', 'Целевой тариф',
                 'Значение параметра фичера Закрытая группа', 'SOC2', 'SOC3',
                 'SOC4', 'SOC5', 'SOC6', 'SOC7', 'SOC8', 'SOC9', 'SOC10',
                 'Соглашение1', 'Соглашение2', 'Соглашение3', 'Соглашение4',
@@ -135,6 +145,7 @@ def main():
     except Exception as e:
         error(f'Не удалось сохранить файл:\n{e}')
         sys.exit()
+    ref_msg = '\nСправочник Payer BAN не выбран' if reference_dict is None else ''
     info(
         f'Обработано строк: {len(result)}\n\n'
         f'Статистика статусов:\n{stats}\n'

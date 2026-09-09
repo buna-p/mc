@@ -3,6 +3,7 @@ from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
 from address_parser2 import parse_address
+from payer_utils import _normalize_key, build_reference_dict
 
 
 def safe_str(val) -> str:
@@ -175,7 +176,7 @@ def extract_city(data: str) -> tuple[str, str]:
     return city, ''
 
 
-def process_row(row) -> dict:
+def process_row(row, reference: dict | None = None) -> dict:
     errors = []
     case_type = safe_str(row.get('Case_Type_3', ''))
     CASE_ID = safe_str(row.get('CASE_ID', ''))
@@ -191,8 +192,8 @@ def process_row(row) -> dict:
     column_10 = safe_str(row.get('column_10', ''))  # пол
     column_13 = safe_str_email(row.get('column_13', ''))  #email
     # column_14 = safe_str(row.get('column_14', '')) конт тлф
-    column_15 = safe_str(row.get('column_15', ''))
-    column_16 = safe_str(row.get('column_16', ''))
+    column_15 = safe_str(row.get('column_15', ''))  # маркет
+    # column_16 = safe_str(row.get('column_16', ''))
 
     quantity = 1
     contact_email = ''
@@ -201,20 +202,25 @@ def process_row(row) -> dict:
 
     if case_type == 'МК.НОВОЕ ВКЛЮЧЕНИЕ ЛЕНДИНГ ПРОМО':
         quantity = extract_quantity(column_1)
-        gorod_podkl, gorod_podkl_error = extract_city(column_16)
-        if gorod_podkl_error:
-            errors.append(gorod_podkl_error)
         email_prefix = 'E_mail_str: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = ''
     elif case_type == 'МК.MNP. НЕТ ВРЕМЕННОГО НОМЕРА':
         quantity = 1
-        gorod_podkl, gorod_podkl_error = extract_city(column_15)
-        if gorod_podkl_error:
-            errors.append(gorod_podkl_error)
         email_prefix = 'Контактный_e_mail_CRQ453539_str: '
         contact_email = extract_email(column_13, email_prefix)
         delivery_email = extract_email(column_13, email_prefix)
+
+    gorod_podkl, gorod_podkl_error = extract_city(column_15)
+    if gorod_podkl_error:
+        errors.append(gorod_podkl_error)
+
+    inn = safe_str(row.get('INN', ''))
+    payer_ban = ''
+    if reference is not None and not gorod_podkl_error:
+        key = (_normalize_key(inn), gorod_podkl)
+        payer_ban = reference.get(key, '')
+
     surname, name, patronymic, fio_error = extract_fio(column_2)
     if fio_error:
         errors.append(fio_error)
@@ -256,6 +262,7 @@ def process_row(row) -> dict:
         'КОЛ_ВО': quantity,
         'Комментарий': CASE_ID,
         'Маркет код': gorod_podkl,
+        'Payer BAN': payer_ban,
         'Фамилия': surname,
         'Имя': name,
         'Отчество': patronymic,
