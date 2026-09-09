@@ -1,6 +1,4 @@
 import pandas as pd
-import re
-from pathlib import Path
 
 
 def _normalize_key(value) -> str:
@@ -19,7 +17,7 @@ def build_reference_dict(ref_df: pd.DataFrame) -> dict:
 
     reference_dict = {}
     for _, ref_row in ref_df.iterrows():
-        raw_inn = ref_row['ИНН']
+        raw_inn = ref_row['INN']
         if pd.notna(raw_inn):
             if isinstance(raw_inn, float):
                 raw_inn = int(raw_inn)
