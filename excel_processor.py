@@ -176,9 +176,9 @@ def extract_city(data: str) -> tuple[str, str]:
     return city, ''
 
 
-def process_row(row, reference: dict | None = None) -> dict:
+def process_row(row, reference) -> dict:
     errors = []
-    case_type = safe_str(row.get('Case_Type_3', ''))
+    case_type = safe_str(row.get('Case_Type3', ''))
     CASE_ID = safe_str(row.get('CASE_ID', ''))
     column_1 = safe_str(row.get('column_1', ''))  # колво или номер
     column_2 = safe_str(row.get('column_2', ''))  # ФИО
