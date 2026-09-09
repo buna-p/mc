@@ -216,8 +216,8 @@ def process_row(row, reference) -> dict:
         errors.append(gorod_podkl_error)
 
     inn = safe_str(row.get('INN', ''))
-    payer_ban = 'пуп'
-    if reference is not None and gorod_podkl_error is None:
+    payer_ban = ''
+    if reference is not None and gorod_podkl_error == '':
         key = (_normalize_key(inn), gorod_podkl)
         payer_ban = reference.get(key, '')
 
