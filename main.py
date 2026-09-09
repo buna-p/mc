@@ -59,14 +59,6 @@ def main():
     if not src:
         error('Исходный файл не выбран либо некорректный, программа завершена')
         sys.exit()
-    payer_file_path = select_payer_file()
-    reference_dict = None
-    if payer_file_path:
-        try:
-            ref_df = pd.read_excel(payer_file_path)
-            reference_dict = build_reference_dict(ref_df)
-        except Exception as e:
-            error('Не удалось загрузить справочник Payer BAN.\n\nПрограмма продолжит работу без справочника.')
     dst = select_output_catalog()
     if not dst:
         error('Сохранение прервано, программа завершена')
@@ -76,6 +68,14 @@ def main():
     except Exception as e:
         error('Ошибка', f'Не удалось прочитать файл:\n{e}')
         sys.exit()
+    payer_file_path = select_payer_file()
+    reference_dict = None
+    if payer_file_path:
+        try:
+            ref_df = pd.read_excel(payer_file_path)
+            reference_dict = build_reference_dict(ref_df)
+        except Exception as e:
+            error('Не удалось загрузить справочник Payer BAN.\n\nПрограмма продолжит работу без справочника.')
     missing = [c for c in NEEDED_COLUMNS if c not in df.columns]
     if missing:
         error(f'Не найдены колонки:\n{missing}\n\n, программа завершена')
