@@ -6,111 +6,100 @@ from dataclasses import asdict, dataclass
 class AddressResult:
     source: str  # исходник
     normalized: str  # нормализованные данные
-    country: str = "РОССИЯ"
+    country: str = 'РОССИЯ'
     postal_code: str = ''
-    region: str = ''
     city: str = ''
     street: str = ''
     house: str = ''
     building: str = ''
     apartment: str = ''
-    status: str = 'GOOD'  # GOOD/WARNING/BAD/ERROR
+    status: str = 'GOOD'  # GOOD/WARNING/ERROR
     comment: str = ''
 
 
-ADDRESS_PREFIX = 'Адрес_регистрации_str: '
+KNOWN_CITIES = (
+    "МОСКВА", "САНКТ-ПЕТЕРБУРГ", "НОВОСИБИРСК", "ЕКАТЕРИНБУРГ", "КАЗАНЬ",
+    "НИЖНИЙ НОВГОРОД", "ЧЕЛЯБИНСК", "САМАРА", "ОМСК", "РОСТОВ-НА-ДОНУ", "УФА",
+    "КРАСНОЯРСК", "ПЕРМЬ", "ВОРОНЕЖ", "ВОЛГОГРАД", "КРАСНОДАР", "САРАТОВ",
+    "ТЮМЕНЬ", "ТОЛЬЯТТИ", "ИЖЕВСК", "БАРНАУЛ", "УЛЬЯНОВСК", "ИРКУТСК",
+    "ХАБАРОВСК", "ЯРОСЛАВЛЬ", "ВЛАДИВОСТОК", "МАХАЧКАЛА", "ТОМСК", "ОРЕНБУРГ",
+    "КЕМЕРОВО", "НОВОКУЗНЕЦК", "РЯЗАНЬ", "АСТРАХАНЬ", "ПЕНЗА", "ЛИПЕЦК", "ТУЛА",
+    "КИРОВ", "ЧЕБОКСАРЫ", "КАЛИНИНГРАД", "БРЯНСК", "КУРСК", "ИВАНОВО", "ТВЕРЬ",
+    "СТАВРОПОЛЬ", "БЕЛГОРОД", "СОЧИ", "СЕВАСТОПОЛЬ", "СИМФЕРОПОЛЬ", "ЙОШКАР-ОЛА",
+)
 
-NUMBER_PATTERN = r'\d+[А-ЯA-Z]?(?:[/\-]\d+[А-ЯA-Z]?)?'  # паттерн для определения номера в адресе (дом, корп, кв)
+MAX_CITY_WORDS = max(len(c.split()) for c in KNOWN_CITIES)
 
-COUNTRY_VALUES = frozenset({'РОССИЯ', 'РФ', 'РОССИЙСКАЯ ФЕДЕРАЦИЯ', 'РОС ФЕД', 'РОСИЯ'})
+KNOWN_CITIES_SET = frozenset(KNOWN_CITIES)
 
 REGION_MARKERS = (
-    'ОБЛ', 'ОБЛ.', 'ОБЛАСТЬ',
-    'КР', 'КР.', 'КРАЙ',
-    'РЕСП', 'РЕСП.', 'РЕСПУБЛИКА',
-    'АО', 'АВТОНОМНЫЙ ОКРУГ',
+    'ОБЛАСТЬ', 'ОБЛ',
+    'КРАЙ', 'КР',
+    'РЕСПУБЛИКА', 'РЕСП',
+    'АВТОНОМНЫЙ ОКРУГ', 'АО',
     'РАЙОН', 'Р-Н')
 
-
-SETTLEMENT_MARKERS = (
-    r'ГОРОД\s+ТИПА|ГОРОД|Г\.?|'
-    r'ДЕРЕВНЯ|ДЕР\.?|'
-    r'СЕЛО|С\.?|'
-    r'ПОС[ЕЁ]ЛОК|ПОС\.?|'
-    r'ПГТ|П\.\s*Г\.\s*Т\.?|'
-    r'СТАНИЦА|СТ-ЦА|СТ\.?|'
-    r'ХУТОР|ХУТ\.?|Х\.?|'
-    r'Д\.?'  # деревня — последним (конфликтует с домом)
+CITY_MARKERS = (
+    'ГОРОД', 'ГОР', 'Г',
+    'ПОСЕЛОК ГОРОДСКОГО ТИПА', 'ПГТ',
+    'РАБОЧИЙ ПОСЕЛОК', 'РП',
+    'ПОСЕЛОК', 'ПОС', 'П',
+    'СТАНИЦА', 'СТ', 'СТ-ЦА',
+    'ХУТОР', 'ХУТ', 'Х',
+    'СЕЛО', 'СЕЛ', 'С',
+    'ДЕРЕВНЯ', 'ДЕР',  # д. конфликтует с домом
 )
 
 STREET_MARKERS = (
-    r'УЛИЦА|УЛ\.?|'
-    r'ПЕРЕУЛОК|ПРОУЛОК|ПЕР\.?|'
-    r'ПРОСПЕКТ|ПР-КТ|'
-    r'ПРОЕЗД|ПР-Д|'
-    r'БУЛЬВАР|Б-Р|'
-    r'НАБЕРЕЖНАЯ|НАБ\.?|'
-    r'ШОССЕ|ШОС\.?|Ш\.?|'
-    r'МИКРОРАЙОН|МКР\.?|'
-    r'КВАРТАЛ|КВ-Л|' #КВ - квартира
-    r'ПЛОЩАДЬ|ПЛ\.?|'
-    r'АЛЛЕЯ|АЛ\.?|'
+    'УЛИЦА', 'УЛ',
+    'ПЕРЕУЛОК', 'ПЕР',
+    'ПРОУЛОК',
+    'ПРОСПЕКТ', 'ПР-КТ', 'ПР',
+    'ПРОЕЗД', 'ПР-Д',
+    'БУЛЬВАР', 'БУЛ', 'Б-Р',
+    'НАБЕРЕЖНАЯ', 'НАБ',
+    'ШОССЕ', 'ШОС', 'Ш',
+    'МИКРОРАЙОН', 'МКР',
+    'КВАРТАЛ', 'КВ-Л',   # КВ - квартира
+    'ПЛОЩАДЬ', 'ПЛ',
+    'АЛЛЕЯ', 'АЛ'
 )
+
+STREET_MARKERS_SET = frozenset(STREET_MARKERS)
 
 HOUSE_MARKERS = (
-    r'ДОМ\.?|Д\.?|'
-    r'ДОМОВЛАДЕНИЕ|ДВЛД\.?|'
+    'Д', 'ДОМ', 'ДВЛД', 'ДОМОВЛАДЕНИЕ'
 )
 
-KNOWN_CITIES = {
-    "МОСКВА", "САНКТ-ПЕТЕРБУРГ", "НОВОСИБИРСК", "ЕКАТЕРИНБУРГ", "КАЗАНЬ", "НИЖНИЙ НОВГОРОД",
-    "ЧЕЛЯБИНСК", "САМАРА", "ОМСК", "РОСТОВ-НА-ДОНУ", "УФА", "КРАСНОЯРСК", "ПЕРМЬ", "ВОРОНЕЖ",
-    "ВОЛГОГРАД", "КРАСНОДАР", "САРАТОВ", "ТЮМЕНЬ", "ТОЛЬЯТТИ", "ИЖЕВСК", "БАРНАУЛ", "УЛЬЯНОВСК",
-    "ИРКУТСК", "ХАБАРОВСК", "ЯРОСЛАВЛЬ", "ВЛАДИВОСТОК", "МАХАЧКАЛА", "ТОМСК", "ОРЕНБУРГ",
-    "КЕМЕРОВО", "НОВОКУЗНЕЦК", "РЯЗАНЬ", "АСТРАХАНЬ", "ПЕНЗА", "ЛИПЕЦК", "ТУЛА", "КИРОВ",
-    "ЧЕБОКСАРЫ", "КАЛИНИНГРАД", "БРЯНСК", "КУРСК", "ИВАНОВО", "ТВЕРЬ", "СТАВРОПОЛЬ", "БЕЛГОРОД",
-    "СОЧИ", "СЕВАСТОПОЛЬ", "СИМФЕРОПОЛЬ",
-}
+BUILDING_MARKERS = (
+    'К', 'КОР', 'КОРП', 'КОРПУС',
+    'ЛИТ', 'ЛИТЕР',
+    'СТР', 'СТРОЕНИЕ'
+)
 
-STREET_SHORT = {
-    "УЛ": "УЛ.", "УЛИЦА": "УЛ.",
-    "ПЕР": "ПЕР.", "ПЕРЕУЛОК": "ПЕР.",
-    "ПРОСПЕКТ": "ПР-КТ", "ПР-КТ": "ПР-КТ",
-    "ПРОЕЗД": "ПР-Д", "ПР-Д": "ПР-Д",
-    "БУЛЬВАР": "Б-Р", "Б-Р": "Б-Р",
-    "НАБЕРЕЖНАЯ": "НАБ.", "НАБ": "НАБ.",
-    "ШОССЕ": "Ш.", "Ш": "Ш.",
-    "МИКРОРАЙОН": "МКР.", "МКР": "МКР.",
-    "КВАРТАЛ": "КВ-Л", "КВ-Л": "КВ-Л",
-    "ПЛОЩАДЬ": "ПЛ.", "ПЛ": "ПЛ.",
-    "АЛЛЕЯ": "АЛ.", "АЛ": "АЛ.",
-}
-
-SETTLEMENT_SHORT = {
-    "Г": "Г.", "ГОРОД": "Г.", "ГОР": "Г.", "ГОР.": "Г.",
-    "Д": "Д.", "ДЕРЕВНЯ": "Д.", "ДЕР": "Д.", "ДЕР.": "Д.",
-    "С": "С.", "СЕЛО": "С.", "СЕЛ": "С.", "СЕЛ.": "С.",
-    "ПОС": "ПОС.", "ПОСЕЛОК": "ПОС.", "ПОСЁЛОК": "ПОС.",
-    "П": "П.",
-    "ПГТ": "ПГТ.", "П.Г.Т": "ПГТ.",
-    "СТ-ЦА": "СТ-ЦА", "СТАНИЦА": "СТ-ЦА",
-    "Х": "Х.", "ХУТОР": "Х.", "ХУТ.": "Х.", "ХУТ": "Х.",
-}
+APARTMENT_MARKERS = (
+    'КВ', 'КВАРТИРА'
+)
 
 
 def normalize_address(data: str) -> str:
     if not isinstance(data, str):
         return ''
-
-    address = data.removeprefix(ADDRESS_PREFIX)
+    all_markers = HOUSE_MARKERS + BUILDING_MARKERS + APARTMENT_MARKERS
+    markers = '|'.join(sorted(all_markers, key=len, reverse=True))
+    address = data.removeprefix('Адрес_регистрации_str: '.upper())
     address = address.strip().upper().replace('Ё', 'Е')
     address = re.sub(r'\s+', ' ', address)
     address = re.sub(r'\s*,\s*', ', ', address)
     address = re.sub(r',+', ',', address)
-    address = re.sub(r'\b(Д|ДОМ|ДВЛД|ДОМОВЛАДЕНИЕ|К|КОР|КОРП|КОРПУС|ЛИТ|ЛИТЕР|СТР|СТРОЕНИЕ|КВ|КВАРТИРА)(?=\d)', r'\1. ', address)
+    address = re.sub(rf'\b({markers})(?=\d)', r'\1. ', address)
     address = re.sub(r'\.(?=[А-ЯA-Z0-9])', '. ', address)
     address = re.sub(r'\s+', ' ', address)
     return address.strip(',. ')
+
+
+def check_latin(text: str) -> bool:
+    return bool(re.search(r'[A-Z]', text))
 
 
 def split_address(address: str) -> list[str]:
@@ -122,378 +111,260 @@ def clean_name(data: str) -> str:
     return value.strip(',. ')
 
 
-def _extract_number(data: str, marker:str) -> str | None:
-    pattern = (r'\b(?:' + marker + r')'
-    r'\.?\s*'
-    r'(?P<number>' + NUMBER_PATTERN + r')\b')
-    match = re.search(pattern, data)
-    return match.group('number').strip().upper() if match else None
-
-
 def extract_postal_code(address: str) -> str | None:
     match = re.search(r'(?<!\d)(\d{6})(?!\d)', address)
     return match.group(1) if match else None
 
 
-def extract_apartment(address: str) -> str | None:
-    return _extract_number(address, r'КВ|КВАРТИРА')
-
-
-def extract_building(address: str, apartment_found: bool = False) -> str | None:
-    if apartment_found:
-        return _extract_number(address, r'К|КОР|КОРП|КОРПУС|ЛИТ|ЛИТЕР|СТР|СТРОЕНИЕ')
-    else:
-        return _extract_number(address, r'КОР|КОРП|КОРПУС|ЛИТ|ЛИТЕР|СТР|СТРОЕНИЕ')
-
-
-def extract_house(address: str) -> str | None:
-    return _extract_number(address, r'Д|ДОМ|ДВЛД|ДОМОВЛАДЕНИЕ')
-
-
-def _normalize_settlement_marker(marker: str) -> str:
-    marker = marker.strip().upper().rstrip('.')
-    mapping = SETTLEMENT_SHORT
-    return mapping.get(marker, marker)
-
-
-def _normalize_street_marker(marker: str) -> str:
-    marker = marker.upper().rstrip('.')
-    mapping = STREET_SHORT
-    return mapping.get(marker, marker)
-
-
-'''def extract_settlement(address: str) -> str | None:
-    match = re.search(
-        r'(?:^|,\s*|\s)'
-        r'(?P<marker>' + SETTLEMENT_MARKERS + r')'
-        r'\s+'
-        r'(?P<name>[А-Я][А-Я0-9\- ]*?)'
-        r'(?=\s*,|\s+(?:' + STREET_MARKERS + r'|ДОМ\.?|ДОМОВЛАДЕНИЕ|ДВЛД\.?|Д\.?)\s*\d|$)',
-        address,
-        )
-    if not match:
-        return None
-    marker = match.group('marker').strip()
-    name = clean_name(match.group('name'))
-    if not name:
-        return None
-    if re.fullmatch(r'Д\.?', marker, re.IGNORECASE) and re.fullmatch(r'"\d+.*', name):
-        return None
-    normalized_marker = _normalize_settlement_marker(marker)
-    return f'{normalized_marker} {name}'''
-
-
-def extract_region(address: str) -> str | None:
-    flat = '|'.join(re.escape(marker.rstrip('.')) for marker in REGION_MARKERS)
-    all_after = SETTLEMENT_MARKERS + '|' + STREET_MARKERS + '|' + HOUSE_MARKERS
+def extract_city(address: str) -> str | None:
+    markers = '|'.join(CITY_MARKERS)
+    markers_after = '|'.join(STREET_MARKERS + HOUSE_MARKERS + BUILDING_MARKERS)
     for part in split_address(address):
-        for marker in REGION_MARKERS:
-            if re.search(rf"\b{re.escape(marker.rstrip('.'))}\.?\b", part):
-                region_only = re.split(
-                    rf'\s+(?:{all_after})\s+',
-                    part,
+        for marker in CITY_MARKERS:
+            match = re.search(rf'\b{marker}(?:\.|\b)\s*(?=[А-Я0-9])', part)
+            if match:
+                tail = part[match.end():]
+                city_only = re.split(
+                    rf'\s+(?:{markers_after})(?:\.|\b)',
+                    tail,
                     maxsplit=1
                 )[0]
-                return clean_name(region_only)
+                if len(clean_name(city_only).split()) >= 3:
+                    return None
+                return clean_name(city_only)
     match = re.search(
-        r'[А-Я][А-Я\- ]*?\s*(?:' + flat + r')\.?\b',
-        address,
+        r'[А-Я][А-Я\- ]*?\s*\b(?:' + markers + r')\.?\b', address
     )
     if match:
         return clean_name(match.group())
     match = re.search(
-        r'\b(?:' + flat + r')\.?\s+[А-Я][А-Я\-]+'
+        r'\b(?:' + markers + r')\.?\s+[А-Я][А-Я\-]+'
         r'(?:\s+[А-Я][А-Я\-]+)*'
-        r'(?=\s*,|\s+(?:' + all_after + r')\b|$)',
+        r'(?=\s*,|\s+(?:' + markers_after + r')\b|$)',
         address,
     )
     return clean_name(match.group()) if match else None
 
 
-def extract_city(address: str) -> str | None:
-    split_on = STREET_MARKERS + '|' + HOUSE_MARKERS
-    for part in split_address(address):
-        match = re.search(
-            r'(?P<marker>' + SETTLEMENT_MARKERS + r')\s+',
-            part,
+def extract_city_by_list(address: str) -> str | None:
+    all_markers_after = frozenset(
+        STREET_MARKERS + HOUSE_MARKERS + BUILDING_MARKERS + APARTMENT_MARKERS
         )
-        if not match:
+    words = re.findall(r'[А-Я0-9\-]+', address)
+    for start in range(len(words)):
+        if start > 0 and words[start - 1] in all_markers_after:
             continue
-
-        marker = match.group('marker').strip()
-        after_marker = part[match.end():]
-
-        name = re.split(r'\s+(?:' + split_on + r')\s+', after_marker, maxsplit=1)[0]
-        name = clean_name(name)
-
-        if not name:
-            continue
-        if re.fullmatch(r'Д\.?', marker, re.IGNORECASE) and re.fullmatch(r'"\d+.*', name):
-            continue
-
-        normalized_marker = _normalize_settlement_marker(marker)
-        return f'{normalized_marker} {name}'
-
+        for n in range(min(MAX_CITY_WORDS, len(words) - start), 0, -1):
+            candidate = ' '.join(words[start:start + n])
+            if candidate in KNOWN_CITIES_SET:
+                return candidate
     return None
+
+
+def check_street(street: str) -> str | None:
+    if street in STREET_MARKERS_SET:
+        return None
+    if len(street.split()) > 3:
+        return None
+    if street and '/' in street:
+        return None
+    return street
 
 
 def extract_street(address: str) -> str | None:
-    prefix_match = re.search(
-        r'(?:^|,\s*|\s)'
-        r'(?P<type>' + STREET_MARKERS + r')'
-        r'\s+'
-        r'(?P<name>[А-ЯA-Z0-9][А-ЯA-Z0-9\- ]*?)'
-        r'(?=\s*,|\s+(?:ДОМ|Д\.?|КОРПУС|КОРП\.?|КВАРТИРА|КВ\.)\s*\d|$)',
+    markers = '|'.join(STREET_MARKERS)
+    markers_after = '|'.join(HOUSE_MARKERS + BUILDING_MARKERS + APARTMENT_MARKERS)
+    for part in split_address(address):
+        for marker in STREET_MARKERS:
+            match = re.search(rf'\b{marker}(?:\.|\b)\s*(?=[А-Я0-9])', part)
+            if match:
+                tail = part[match.start():]
+                street_only = re.split(
+                    rf'\s+\d[\d\-/А-Я]*(?=\s+(?:{markers_after})\b|$)'
+                    rf'|\s+(?:{markers_after})(?:\.|\b)',
+                    tail,
+                    maxsplit=1
+                )[0]
+                result = clean_name(street_only)
+                if result in STREET_MARKERS_SET:
+                    return None
+                if len(result.split()) >= 5:
+                    return None
+                return result
+    match = re.search(
+        r'[А-Я0-9][А-Я0-9\- ]*?\s*\b(?:' + markers + r')\.?\b', address
+    )
+    if match:
+        result = clean_name(match.group())
+        return result if check_street(result) else None
+    match = re.search(
+        r'\b(?:' + markers + r')\.?\s+'
+        r'([А-Я][А-Я\- ]*?)'
+        r'(?=\s+\d|\s+(?:' + markers_after + r')\b|$)',
         address,
     )
-    if prefix_match:
-        street_type = _normalize_street_marker(prefix_match.group('type'))
-        name = clean_name(prefix_match.group('name'))
-        if name:
-            return f'{street_type} {name}'
-    suffix_match = re.search(
-        r'(?:^|,\s*)'
-        r'(?P<name>[А-ЯA-Z0-9][А-ЯA-Z0-9\- ]*?)\s+'
-        r'(?P<type>' + STREET_MARKERS + r')'
-        r'(?=\s*,|$)',
-        address,
-    )
-    if suffix_match:
-        street_type = _normalize_street_marker(suffix_match.group('type'))
-        name = clean_name(suffix_match.group('name'))
-        if name:
-            return f'{street_type} {name}'
+    if match:
+        result = clean_name(match.group())
+        return result if check_street(result) else None
     return None
 
 
-def _is_region(part: str) -> bool:
-    for marker in REGION_MARKERS:
-        if re.search(rf'\b{re.escape(marker.rstrip("."))}\.?\b', part):
-            return True
-    return False
-
-
-def extract_city_before_street_marker(address: str) -> str | None:
-    flat = '|'.join(re.escape(marker.rstrip('.')) for marker in COUNTRY_VALUES)
-    street_marker_pattern = (
-        r'\b(?:' + STREET_MARKERS + r')\s+'
+def extract_house(address: str) -> str | None:
+    markers = '|'.join(HOUSE_MARKERS)
+    markers_after = '|'.join(BUILDING_MARKERS + APARTMENT_MARKERS)
+    for part in split_address(address):
+        for marker in HOUSE_MARKERS:
+            match = re.search(rf'\b{marker}(?:\.|\b)\s*(?=[0-9])', part)
+            if match:
+                tail = part[match.end():]
+                house_only = re.split(
+                    rf'\s+(?:{markers_after})(?:\.|\b)',
+                    tail,
+                    maxsplit=1
+                )[0]
+                return clean_name(house_only)
+    match = re.search(
+        r'[0-9][А-Я0-9\-/]*?\s*(?:' + markers + r')\.?\b', address
     )
-    match = re.search(street_marker_pattern, address)
-    if not match:
-        return None
-    before_street = address[:match.start()].strip(' ,.')
-    before_street = re.sub(r'^\d{6}\s*', '', before_street).strip(' ,')
-    before_street = re.sub(
-        r'^(?:' + flat + r')\s*', '', before_street).strip(' ,')
-    for marker in REGION_MARKERS:
-        before_street = re.sub(
-            rf'[А-ЯA-Z\- ]*?\b{re.escape(marker.rstrip("."))}\.?\b\s*',
-            '', before_street, flags=re.IGNORECASE
-        ).strip(' ,')
-    if not before_street:
-        return None
-    if _is_region(before_street):
-        return None
-    return f'{clean_name(before_street)}'
+    if match:
+        return clean_name(match.group())
+    match = re.search(
+        r'\b(?:' + markers + r')\.?\s+'
+        r'([0-9][А-Я0-9\-/]*?)'
+        r'(?=\s+(?:' + markers_after + r')\b|\s*,|$)',
+        address,
+    )
+    if match:
+        return clean_name(match.group())
+    match = re.search(
+        r'(?<=[А-Я,])\s+(\d[\d\-/А-Я]*)'
+        r'(?=\s+(?:' + markers_after + r')\b|\s*,|$)',
+        address,
+    )
+    return clean_name(match.group(1)) if match else None
 
 
-def _is_explicit_component(part: str) -> bool:
-    return bool(
-        re.match(
-            r"^(?:ДОМ|Д|КОРПУС|КОРП|КВАРТИРА|КВ)\.?\s*\d",
-            part,
-        )
+def extract_building(address: str) -> str | None:
+    markers = '|'.join(BUILDING_MARKERS)
+    markers_after = '|'.join(APARTMENT_MARKERS)
+    for part in split_address(address):
+        for marker in BUILDING_MARKERS:
+            match = re.search(rf'\b{marker}(?:\.|\b)\s*(?=[0-9])', part)
+            if match:
+                tail = part[match.end():]
+                house_only = re.split(
+                    rf'\s+(?:{markers_after})(?:\.|\b)',
+                    tail,
+                    maxsplit=1
+                )[0]
+                return clean_name(house_only)
+    match = re.search(
+        r'\b(?:' + markers + r')\.?\s+'
+        r'([0-9][А-Я0-9\-/]*?)'
+        r'(?=\s+(?:' + markers_after + r')\b|\s*,|$)',
+        address,
+    )
+    return clean_name(match.group(1)) if match else None
+
+
+def extract_apartment(address: str) -> str | None:
+    markers = '|'.join(APARTMENT_MARKERS)
+    for part in split_address(address):
+        for marker in APARTMENT_MARKERS:
+            match = re.search(rf'\b{marker}(?:\.|\b)\s*(?=[0-9])', part)
+            if match:
+                tail = part[match.end():]
+                if re.search(r'\d[А-Я]{3,}', tail):
+                    return 'ERROR'
+                if len(tail.split()) > 1:
+                    return 'ERROR'
+                return clean_name(tail)
+    match = re.search(
+        r'\b(?:' + markers + r')\.?\s+'
+        r'([0-9][А-Я0-9\-/]*?)',
+        address,
     )
 
-
-def _is_postal_code(part: str) -> bool:
-    return bool(re.fullmatch(r"\d{6}", part))
+    return clean_name(match.group(1)) if match else None
 
 
-def _is_country(part: str) -> bool:
-    return part.strip(" .") in COUNTRY_VALUES
-
-
-def _is_number(part: str) -> bool:
-    return bool(re.fullmatch(NUMBER_PATTERN, part))
-
-
-def _is_capitalized_word(part: str) -> bool:
-    return bool(re.fullmatch(r"[А-ЯA-Z][А-ЯA-Z\- ]+", part))
-
-
-def extract_unmarked_parts(address: str, city: str | None, street: str | None, house: str | None, apartment: str | None) -> tuple[str | None, str | None, str | None, str | None, bool]:
-    parts = split_address(address)
-    used_assumption = False
-
-    remaining = []
-    for part in parts:
-        if _is_postal_code(part):
-            continue
-        if _is_country(part):
-            continue
-        if _is_region(part):
-            continue
-        if _is_explicit_component(part):
-            continue
-        remaining.append(part)
-
-    if city:
-        city_name = re.sub(r"^[А-Я]+\.\s*", "", city)
-        remaining = [p for p in remaining if city_name not in p]
-    if street:
-        street_name_match = re.match(
-            r"^(?:УЛ\.|ПЕР\.|ПР-КТ|ПР-Д|Б-Р|НАБ\.|Ш\.|МКР\.|КВ-Л|ПЛ\.)\s*(.+)",
-            street,
-        )
-        if street_name_match:
-            street_name = street_name_match.group(1)
-            remaining = [p for p in remaining if street_name not in p]
-
-    text_parts = [p for p in remaining if not _is_number(p)]
-    number_parts = [p for p in remaining if _is_number(p)]
-
-    if city is None and text_parts:
-        first_text = text_parts[0]
-        if first_text in KNOWN_CITIES or _is_capitalized_word(first_text):
-            city = f"Г. {clean_name(first_text)}"
-            text_parts = text_parts[1:]
-            used_assumption = True
-
-    if street is None and text_parts:
-        street = f"УЛ. {clean_name(text_parts[0])}"
-        used_assumption = True
-
-    if house is None and number_parts:
-        house = number_parts[0]
-        used_assumption = True
-
-    if apartment is None and len(number_parts) >= 2:
-        apartment = number_parts[1]
-        used_assumption = True
-
-    return city, street, house, apartment, used_assumption
-
-
-def resolve_building_vs_apartment(
-    address: str,
-    building: str | None,
-    apartment: str | None,
-) -> tuple[str | None, str | None, bool]:
-    changed = False
-
-    if building and apartment:
-        return building, apartment, changed
-
-    if building and re.search(r"\bКОРПУС\b|\bКОРП\b", address):
-        return building, apartment, changed
-
-    has_kv = bool(re.search(r"\b(?:КВАРТИРА|КВ)\.?\s*\d", address))
-    has_k = bool(re.search(r"\bК\.?\s*\d", address))
-
-    if has_kv and has_k and not building:
-        match = re.search(r"\bК\.?\s*(?P<number>" + NUMBER_PATTERN + r")", address)
-        if match:
-            building = match.group("number")
-            changed = True
-
-    if has_k and not has_kv and not apartment:
-        match = re.search(r"\bК\.?\s*(?P<number>" + NUMBER_PATTERN + r")", address)
-        if match:
-            before_k = address[:match.start()]
-            has_house_before = bool(re.search(r"\b(?:ДОМ|Д)\.?\s*\d", before_k))
-
-            if has_house_before and not building:
-                building = match.group("number")
-                changed = True
-            elif not apartment:
-                apartment = match.group("number")
-                changed = True
-
-    return building, apartment, changed
+def split_house_number(house: str) -> tuple[str, str] | None:
+    if not house:
+        return None
+    match = re.fullmatch(r'(\d+[А-Я]?)-(\d+)', house)
+    if match:
+        return match.group(1), match.group(2)
+    return None
 
 
 def parse_address(address: str) -> dict:
-    if not isinstance(address, str) or not address.strip():
+    if not isinstance(address, str) or not address:
         result = AddressResult(
             source='' if address is None else str(address),
-            normalized='',
             status='ERROR',
-            comment='АДРЕС: ПУСТО ИЛИ ИМЕЕТ НЕКОРРЕКТНЫЙ ТИП',
+            comment='ПУСТО ИЛИ НЕКОРРЕКТНЫЙ',
         )
         return asdict(result)
 
     normalized = normalize_address(address)
-    used_assumption = False
+    used_WARNING = False
+    comment_WARNING = []
+
+    if check_latin(normalized):
+        used_WARNING = True
+        comment_WARNING.append('ЛАТИНИЦА')
 
     postal_code = extract_postal_code(normalized) or ''
-    region = extract_region(normalized) or ''
     city = extract_city(normalized)
     street = extract_street(normalized)
     house = extract_house(normalized)
+    building = extract_building(normalized)
     apartment = extract_apartment(normalized)
-    building = extract_building(normalized, apartment_found=bool(apartment))
-
+    if house and not apartment:
+        split = split_house_number(house)
+        if split:
+            house, apartment = split
     if city is None:
-        city = extract_city_before_street_marker(normalized)
-        if city is not None:
-            used_assumption = True
+        city = extract_city_by_list(normalized)
+    if street and re.search(rf'{re.escape(street)}\s+\d', normalized):
+        used_WARNING = True
+        comment_WARNING.append('УЛИЦА И ДОМ ОПРЕДЕЛЕНЫ ЭВРИСТИЧЕСКИ')
 
-    if city is None:
-        parts = split_address(normalized)
-        for part in parts:
-            if part in KNOWN_CITIES:
-                city = f'{part}'
-                used_assumption = True
-                break
-
-    if city is None or street is None or house is None:
-        city, street, house, apartment, fallback_used = extract_unmarked_parts(
-            address=normalized,
-            city=city,
-            street=street,
-            house=house,
-            apartment=apartment,
-        )
-        used_assumption = used_assumption or fallback_used
-
-    # ── Этап 5: контекстная коррекция «К.» ──
-    building, apartment, resolve_changed = resolve_building_vs_apartment(
-        normalized, building, apartment
-    )
-    if resolve_changed:
-        used_assumption = True
-
-    # ── Этап 6: статус ──
     missing = []
     if not city:
-        missing.append("ГОРОД")
+        missing.append('город')
     if not street:
-        missing.append("УЛИЦА")
+        missing.append('улица')
     if not house:
-        missing.append("ДОМ")
+        missing.append('дом')
+    if apartment == 'ERROR':
+        missing.append('квартира')
 
     if missing:
-        status = "MANUAL"
-        comment = "НЕ РАСПОЗНАНО: " + ", ".join(missing)
-    elif used_assumption:
-        status = "WARNING"
-        comment = "ЧАСТЬ ДАННЫХ ОПРЕДЕЛЕНА ЭВРИСТИЧЕСКИ"
+        status = 'ERROR'
+        city = normalized
+        street = ''
+        house = ''
+        building = ''
+        apartment = ''
+        comment = 'АДРЕС: НЕ РАСПОЗНАН'
+    elif used_WARNING:
+        status = 'WARNING'
+        comment = '; '.join(comment_WARNING)
     else:
-        status = "GOOD"
-        comment = ""
+        status = 'GOOD'
+        comment = ''
 
     result = AddressResult(
         source=address,
         normalized=normalized,
-        country="РОССИЯ",
+        country='РОССИЯ',
         postal_code=postal_code,
-        region=region,
-        city=city or "",
-        street=street or "",
-        house=house or "",
-        building=building or "",
-        apartment=apartment or "",
+        city=city or '',
+        street=street or '',
+        house=house or '',
+        building=building or '',
+        apartment=apartment or '',
         status=status,
         comment=comment,
     )
@@ -502,193 +373,412 @@ def parse_address(address: str) -> dict:
 
 
 
-
-
-
-
 if __name__ == "__main__":
     test_addresses = [
-        "Адрес_регистрации_str: Московская обл., г. Электросталь, проезд Полярный, д. 5А, кв. 27",
-        "Адрес_регистрации_str: Г. САНКТ-ПЕТЕРБУРГ, УЛИЦА ОКТЯБРЬСКАЯ НАБ. Д. 90, К. 6, КВ. 64",
-        "Адрес_регистрации_str: Красноярск ул.Матросова д.40 кв.146",
-        "Адрес_регистрации_str: г. Новосибирск ул. Фрунзе 20-135",
-        "Адрес_регистрации_str: 624250 Российская Федерация, обл Свердловская, г Заречный, ул Ленина, д. 35А, кв. 57",
-        "Адрес_регистрации_str: Верхняя салда Карла Либкнехта д.1, кв. 11",
-        "Адрес_регистрации_str: г. Новосибирск, ул. Фрунзе 20-135",
-        "Адрес_регистрации_str: Республика Башкортостан Татышлинский район село Ялгы-Нарат улица Центральная дом 15",
-        "Адрес_регистрации_str: г. Ижевск, ул. Березняковская, д. 2",
-        "Адрес_регистрации_str: Республика Башкортостан, г. Ишимбай, ул. Гагарина, д. 28, кв. 72",
-        "Адрес_регистрации_str: п.Н.Доскино,л.16,д.18",
-        "Адрес_регистрации_str: 624250 Российская Федерация, обл Свердловская, г Заречный, ул Ленина, д. 35А, кв. 57",
-        "Адрес_регистрации_str: Москва ул. Халтуринская 17 кв.78",
-        "Адрес_регистрации_str: с. Топольное ул. В. Табачкова 24аби1",
-        "Адрес_регистрации_str: г. Иркутск ул 4-я Советская д 19А",
-        "Адрес_регистрации_str: Ханты-Мансийский автономный округ - Югра, г.Нефтеюганск, 13 микрорайон, д. 8, кв.48",
-        "Адрес_регистрации_str: г. Самара, ул. Георгия Ратнера, д. 21, кв. 78",
-        "Адрес_регистрации_str: г. Москва, пер. Ангелов, д. 6, к. 3, кв. 507",
-        "Адрес_регистрации_str: Самарская область, пгт. Безенчук, ул. Новостепановка, д. 3,.кв. 3",
-        "Адрес_регистрации_str: Обл. Московская. г. Красногорск, РП.Нахабино, д.7,кв.441",
-        "Адрес_регистрации_str: Волгоград  пр.Столетова дом 6 кв.89",
-        "Адрес_регистрации_str: Город Сочи адлерский р-он с. Казачий брод ул краснофлотская дом 26 «снт Солнышко»",
-        "Адрес_регистрации_str: Омск, улица Бородина д.15 кв.77",
-        "Адрес_регистрации_str: 420140, г. Казань, ул. Центральная 37А",
-        "Адрес_регистрации_str: обл. Пензенская, г. Пенза, ул. Пушкина, д. 91, кв. 28",
-        "Адрес_регистрации_str: Московская область, г. Шатура, ул. Советская, д. 40, кв. 57",
-        "Адрес_регистрации_str: Республика Алтай, Чемальский район, с. Чемал, ул. Анохина 32",
-        "Адрес_регистрации_str: с. Октябрьское ул. Почтовая 59",
-        "Адрес_регистрации_str: П. Краснооктябрьский ул. Ленина д.2 КВ.1",
-        "Адрес_регистрации_str: Краснооктябрьский ул. Ленина д2 кв1",
-        "Адрес_регистрации_str: Пензенская обл, г Сердобск, ул Каракозова, двлд 8",
-        "Адрес_регистрации_str: Ст. Ленинградская улица Тихая 140",
-        "Адрес_регистрации_str: Респ. Карелия г. Петрозаводск ул Пархоменко д. 33,  кв. 120",
-        "Адрес_регистрации_str: Ставропольский край г. Лермонтов ул. Патриса Лумумбы д. 5 кв. 33",
-        "Адрес_регистрации_str: Пермский край, Пермь, Охотников 32, кв. 37",
-        "Адрес_регистрации_str: Республика Башкортостан, город Давлеканово , переулок Степной д. 12",
-        "Адрес_регистрации_str: Г. Якутск, ул. Курнатовского 1/4 кв44",
-        "Адрес_регистрации_str: Тюмень Газопромысловая 8",
-        "Адрес_регистрации_str: Попов проезд, д.1, к.1, кв.53",
-        "Адрес_регистрации_str: Свердловская область, г.Верхняя Пышма, ул.Ураьльских рабочих, д.48, кв.71",
-        "Адрес_регистрации_str: Город МОСКВА, Улица ГУРЬЯНОВА, дом 6, корпус 1",
-        "Адрес_регистрации_str: 625520, Тюменская обл, рп. Богандинский, ул. Крестьянская 17",
-        "Адрес_регистрации_str: Г. Заречный, ул алещенкова 26, кв 25",
-        "Адрес_регистрации_str: липецкая область, город липецк, ул. северная, д.26а",
-        "Адрес_регистрации_str: г. Светлоград, ул. 9 января, д. 89",
-        "Адрес_регистрации_str: г. Калуга, пер. 1-й Пестеля, д. 30, к. 1, кв. 15",
-        "Адрес_регистрации_str: Г. Барнаул.Советской Армии 50 а к/2 КВ 69",
-        "Адрес_регистрации_str: Ул строителей 27-30",
-        "Адрес_регистрации_str: Томск проспект Кирова 53/6 кв 16",
-        "Адрес_регистрации_str: Г. Заречный, ул алещенкова 26, кв 25",
-        "Адрес_регистрации_str: г. Ижевск, ул. Березняковская, д. 2",
-        "Адрес_регистрации_str: Алтайский край, г. Заринск, ул. Союза Республик, 12, кв 241",
-        "Адрес_регистрации_str: Москва, улица Родионовская дом2 квартира46",
-        "Адрес_регистрации_str: г. Москва. ул. Генерала Глаголева, дом 30, корп. 3, кв. 271.",
-        "Адрес_регистрации_str: Алтайский край, г.Барнаул, проезд Южно Власихинский,28а-2",
-        "Адрес_регистрации_str: г. Владимир, ул. Чайковского, д.38В, кв30",
-        "Адрес_регистрации_str: Калининградская область. г. Гусев ул Ю. Смирнова д 18 кв 11",
-        "Адрес_регистрации_str: Воронеж, улица 20-летия Октября,38А",
-        "Адрес_регистрации_str: Москва, Рязанский проспект, д. 64, к.2, кв. 390",
-        "Адрес_регистрации_str: проезд. Матросова, д. 18",
-        "Адрес_регистрации_str: 109386, Г. МОСКВА, УЛ. НОВОРОССИЙСКАЯ Д.21, КВ.61",
-        "Адрес_регистрации_str: Самарская область город Новокуйбышевск проспект победы 15-129",
-        "Адрес_регистрации_str: Г. Нововоронеж ул. Аленовская д. 42, кв 82",
-        "Адрес_регистрации_str: Г. Якутск, ул Курнатовского 1/4, кв. 44",
-        "Адрес_регистрации_str: г. Самара, ул. Георгия Ратнера, д. 21, кв. 78",
-        "Адрес_регистрации_str: Самарская область город Новокуйбышевск проспект Победы 42 квартира 65",
-        "Адрес_регистрации_str: Самарская область, город Новокуйбышевск, улица Островского д.8 кв.130",
-        "Адрес_регистрации_str: Самарская обл, г Новокуйбышевск, ул Кадомцева, д 7, кв 24",
-        "Адрес_регистрации_str: Великий Новгород, Большая Московская 132-135",
-        "Адрес_регистрации_str: г. Москва, г. Зеленоград, корпус 360, квартира 149",
-        "Адрес_регистрации_str: Чувашская Республика - Чувашия,Чебоксарский район, Чиршкасы (Сирмапосинского с/п ) д, 11 пятилетки дом 5, кв 12",
-        "Адрес_регистрации_str: П. Маяк, ул. Дорожная д.6 кв 8",
-        "Адрес_регистрации_str: Обл. Свердловская гор. Ирбит ул. Школьная дом 38",
-        "Адрес_регистрации_str: г.Чебоксары пер.Ягодный 6 к1 кв3",
-        "Адрес_регистрации_str: Самарская обл, г Новокуйбышевск, ул Кадомцева, д 7, кв 24",
-        "Адрес_регистрации_str: ГОР, КРАСНОДАР УЛ. МИЧУРИНА д. 33",
-        "Адрес_регистрации_str: Ульяновск, герасимова 45кв2",
-        "Адрес_регистрации_str: Забайкальский край в Черновском р-н г Читы ул Староивановская 37а",
-        "Адрес_регистрации_str: Г. Заречный, ул алещенкова 26, кв 25Екатеринбург",
-        "Адрес_регистрации_str: Г. Самара ул.Революционная Д.101в кв.68",
-        "Адрес_регистрации_str: Московская обл., г. Воскресенск, ул. Зелинского, д. 5А, кв. 59",
-        "Адрес_регистрации_str: Нижний Новгород, пр.Ленина, д.59, корп.7, кв.15",
-        "Адрес_регистрации_str: Московская обл., г. Воскресенск, ул. Зелинского, д. 5А, кв. 59",
-        "Адрес_регистрации_str: Курская обл. г.Курчатов ул. Энергетиков д.31 кв. 88",
-        "Адрес_регистрации_str: Республика Коми УСТЬ-ВЫМЬСКИЙ район г. МИКУНЬ ул. Ленина д. 19а кв. 53",
-        "Адрес_регистрации_str: Воронежская обл, с. Новая Усмань, ул Красная Поляна, д 64",
-        "Адрес_регистрации_str: Г. МОСКВА, УЛ. НОВОРОССИЙСКАЯ, Д.21, КВ.61",
-        "Адрес_регистрации_str: Курский р-он, д. 1-е Цветово, ул. Луговая, д.5",
-        "Адрес_регистрации_str: 660118, край Красноярский, г Красноярск, ул Мате Залки, д 38, кв 32",
-        "Адрес_регистрации_str: Калининградская обл., Светловский городской округ, посёлок Веселовка, ул. Тенистая, дом 14, кв. 1",
-        "Адрес_регистрации_str: Новокуйбышевск  ул. Дзержинского  д.8 кв.99",
-        "Адрес_регистрации_str: РЕСПУБЛИКА КАЛМЫКИЯ ЯШКУЛЬСКИЙ РАЙОН ПОС. ЯШКУЛЬ ПЕР. ОКТЯБРЬСКИЙ ДОМ 1",
-        "Адрес_регистрации_str: Самарская область город Новокуйбышевск проспект Победы 42 квартира 65",
-        "Адрес_регистрации_str: СПБ, Московское шоссе 16 корпус 1, квартира 70",
-        "Адрес_регистрации_str: г. Чебоксары, ул. Пролетарская, д.27, КВ. 294",
-        "Адрес_регистрации_str: Казань ул. утренняя д.36",
-        "Адрес_регистрации_str: Г. Заречный, ул алещенкова 26, кв 25",
-        "Адрес_регистрации_str: Ростовская область город Таганрог ул. Яблочкина дом 15 кв. 6",
-        "Адрес_регистрации_str: Новосибирская область ,Ордынский район, село Чингис,,ул.Кустарная,д.3",
-        "Адрес_регистрации_str: Город Верхняя Пышма, ул. Уральских Рабочих, д. 2а, кв. 8",
-        "Адрес_регистрации_str: Кемеровская область город Мыски улица Гвардейская дом 23",
-        "Адрес_регистрации_str: Краснооктябрьский ул Ленина",
-        "Адрес_регистрации_str: Оренбургская обл., Оренбургский р-он, с. Южный Урал, ул. Буденного д.12 кв.2",
-        "Адрес_регистрации_str: Республика Башкортостан г. Белебей ул шоссейная д. 13",
-        "Адрес_регистрации_str: Кемеровская область поселок Металлплощадка б-р Строителей 71 к 8. Кв. 26",
-        "Адрес_регистрации_str: Нагатинская набережная 40/1 328",
-        "Адрес_регистрации_str: САМАРСКАЯ ОБЛАСТЬ Г.СЫЗРАНЬ, УЛ РАБОЧАЯ Д.68 КВ.1",
-        "Адрес_регистрации_str: Кировская область г. КИРОВ. УЛ. АРХИТЕКТОРА ВАЛЕРИЯ ЗЯНКИНА Д. 11.КОР.1 КВ. 82",
-        "Адрес_регистрации_str: Город Верхняя Пышма, ул. Уральских Рабочих, д. 2а, кв. 8",
-        "Адрес_регистрации_str: Воронежская область, с. Новая Усмань, ул. Красная Поляна, д. 64",
-        "Адрес_регистрации_str: Обл. Ростовская , р-н Аксайский , г. Аксай, ул. Садовая 31А",
-        "Адрес_регистрации_str: Г.Ростов-на-Дону ул. Куприна дом 7а стр 3",
-        "Адрес_регистрации_str: Свердловская область город Екатеринбург улица Академика Парина дом 33 квартира 617",
-        "Адрес_регистрации_str: САРАТОВСКАЯ ОБЛ, Г. САРАТОВ, УЛ. СОВЕТСКАЯ, Д. 90/96, КВ. 35",
-        "Адрес_регистрации_str: Г.Ростов-на-Дону ул. Куприна д7а стр 3",
-        "Адрес_регистрации_str: г. Москва, ул. 6-я Кожуховская, д. 10, кв. 122",
-        "Адрес_регистрации_str: Липецк г, Меркулова,д 3,кв 13",
-        "Адрес_регистрации_str: Отрадный Победы 5а 34",
-        "Адрес_регистрации_str: г. Санкт-Петербург, ул. Среднерогатская, д. 9, лит. А, кв. 216",
-        "Адрес_регистрации_str: Отрадный Победы 5а 34",
-        "Адрес_регистрации_str: Г Кемерово. Улица свободы 17-44",
-        "Адрес_регистрации_str: с. Смоленское ул. Энергетическая 36 кв2",
-        "Адрес_регистрации_str: Г. Липецк, ул. Металлистов, д. 4, кв. 11",
-        "Адрес_регистрации_str: Воронеж ул Черноморская д21",
-        "Адрес_регистрации_str: Ивановская область, г. Шуя, ул. 3-я Пушкинская, 47",
-        "Адрес_регистрации_str: Москва ул.Недорубова д 27 кв 3",
-        "Адрес_регистрации_str: Липецк г, Водопьянова ул, 15",
-        "Адрес_регистрации_str: Ул. Ратная, д. 8, к. 3, кв. 141",
-        "Адрес_регистрации_str: Бульвар ботанический 15-302",
-        "Адрес_регистрации_str: ул. Авиаконструктора Петлякова, д.11, кв.11",
-        "Адрес_регистрации_str: г. Москва, Алтуфьевское шоссе, д. 92, кв. 288",
-        "Адрес_регистрации_str: Обл Московская; г Реутов улица Октябра д 52 ; кв1006",
-        "Адрес_регистрации_str: г. Москва, Славянский б-р., дом 9, корп. 6, кв. 152",
-        "Адрес_регистрации_str: Курская область, г.Курчатов, ул.Садовая, д.21, кв.16",
-        "Адрес_регистрации_str: г. Красноярск, ул. Соколовская, д. 74 кв. 308",
-        "Адрес_регистрации_str: Московская обл., ул. 9 мая д.14 кв. 1",
-        "Адрес_регистрации_str: г. Калининград, ул. Памяти павших в Афганистане 17. кв 15",
-        "Адрес_регистрации_str: Республика Дагестан Цумадинский р-н С метрада ул И Шамиля д46",
-        "Адрес_регистрации_str: Челябинская область Сосновский район поселок Рощино Ленина 2 квартира 2",
-        "Адрес_регистрации_str: Г.Иваново Ивановская область , микрорайон ТЭЦ-3 , д.10 кв.32",
-        "Адрес_регистрации_str: Челябинск",
-        "Адрес_регистрации_str: Ульяновская область, Старокулаткинский район, село Кармалей, ул. Кооперативная дом 4",
-        "Адрес_регистрации_str: с.Сергиевское Радиоцентра №5,д.16-115",
-        "Адрес_регистрации_str: Подольск, Пионерская 15,137",
-        "Адрес_регистрации_str: Химки, 9 мая, 3, 147",
-        "Адрес_регистрации_str: г.Москва,ул.Зеленоградская д.17,кв.224",
-        "Адрес_регистрации_str: Г. Ростов-на-Дону ул. Куприна дом 7а стр 3",
-        "Адрес_регистрации_str: УЛ. БЕЛОМОРСКАЯ ДОМ 12, КВ. 59",
-        "Адрес_регистрации_str: Кировская область город Вятские Поляны улица Чехова дом 33",
-        "Адрес_регистрации_str: Москва, ул. Авиационная, д. 74, к. 2, кв. 11",
-        "Адрес_регистрации_str: г.Омск 24 северная дом 198 кВ.84",
-        "Адрес_регистрации_str: г.Новосибирск, ул. Вавилова, 7-85",
-        "Адрес_регистрации_str: Волгоградская область, г. Котельниково, улица Советская д.19 кв. 102",
-        "Адрес_регистрации_str: Алтайский край, р-н Смоленский, с. Смоленское, ул. Энергетическая дом 36 кв 2",
-        "Адрес_регистрации_str: Реутов МО, Юбилейный проспект., д. 60 кв. 375",
-        "Адрес_регистрации_str: Недорубова 27 кв 3",
-        "Адрес_регистрации_str: Оренбургский район, с. Нежинка ул. Фестивальная 17 кв. 29",
-        "Адрес_регистрации_str: Коммунаров",
-        "Адрес_регистрации_str: 121351 г.москва, ул. ивана франко д.42/2 кв.114",
-        "Адрес_регистрации_str: 655017, Респ. Хакасия, г. Абакан, ул. Чертыгашева, д 42, кв 17",
-        "Адрес_регистрации_str: ГОРОД МОСКВА УЛИЦА ХАЧАТУРЯНА ДОМ 7 КВАРТИРА 73",
-        "Адрес_регистрации_str: 121351 г.москва, ул. ивана франко д.42/2 кв.114",
-        "Адрес_регистрации_str: г.Новосибирск, ул. Вавилова, 7-85",
-        "Адрес_регистрации_str: Новосибирск, ул Макаренко д 7 кв 92",
-        "Адрес_регистрации_str: Недорубова 27  кв 3",
-        "Адрес_регистрации_str: РМЭ, Советский район, п.Ургакш, ул. Новая, д.4, кв.15",
-        "Адрес_регистрации_str: г. Калининград ул. Лужская 23Б к. 1 кв. 96",
+        "ПГТ БЕЗЕНЧУК БЕЗЕНЧУКСКИЙ РАЙОН САМАРСКАЯ ОБЛАСТЬ",
+        "г.Москва, р-н Коммунарка, п.Коммунарка, ул.Александры Монаховой, д.85 к.2, кв.246",
+        "Московская область, г.Ступино, рп Малино, ул. Весенняя, д. 10а",
+        "Москва",
+        "г. Москва, ул. Молотовых д.5 кв. 63",
+        "141202, обл. Московская, г. Пушкино, ул. Просвещения, д 13 к 3, кв 171",
+        "Краснодарский край, г. Краснодар, ул. Им. Генерала Трошева Г.Н., д. 29, кв. 134",
+        "г.Рязань, ул.Щорса, д.35, к.2, кв.60",
+        "Москва, ул.Саранская д.7 кв 52",
+        "Г. Москва, ул. Петрозаводская, д. 17к2, кв. 215",
+        "ульяновская область николаевский район село канадей советская 89",
+        "Гусев ул. 9 мая д. 7 кв. 4",
+        "Город Ковров ул. Волго-Донская дом 29 квартира 146",
+        "Котова дом 95 квартира 11",
+        "Пермский край город Лысьва ул Федосеева у3 кв 49",
+        "Республика Чувашия, г. Чебоксары, ул. Богдана Хмельницкого, 78-47",
+        "г. Москва, ул. Чпроитовая, д. 1, к, 4, кв. 236",
+        "Город Астрахань улица 3я рыбинская дом 16",
+        "г. Москва, ул. Льва Кассиля, д.1к2, кв.56",
+        "Область Самарская, город Жигулевск, улица Пролетарская д 17 КВ 21",
+        "Город Лысьва ул. Федосеева 33 кв 49",
+        "Обл. Воронежская г. Воронеж ул. Конституции 86",
+        "Санкт-Петербург, Дунайский проспект д. 55 к. 1 лит. А кв. 269",
+        "Липецкая область город Елец улица Радиотехническая дом 16 квартира 93",
+        "Новгородская область, Новгородский район, с.п Ермолинское, д. Новая Мельница, ул. Красивая д. 16",
+        "Челябинская область аргаяшский район д Саитова Ильменская 8",
+        "Нефтеюганск 14 микрорайон, 18 Дом, 48 квартира",
+        "Г. Краснодар, ул. Селезнева, 176, кв. 87",
+        "Г. Москва, ул. Минская, д.1г, к3, кв7",
+        "Город Самара, ул.Печерская, д.151, кв. 9",
+        "Самара парижской коммуны 23-9Самара",
+        "Черкесск, Красная 5, квартира 5",
+        "Г. Оренбург, Загородное шоссе, 57/2, 19 квартира",
+        "Г.Нефтекамск ул.Социалистическая 63-45",
+        "Нововоронеж",
+        "241519, Брянская область, п. Путевка, ул. Андрея Галицина, д. 2, кв. 465Брянск",
+        "г. Калининград, Согласия, Д. 21, Кв. 48",
+        "Оренбургский район Хутор Степановский улица Садовая дом 4",
+        "г. Калининград, Согласия, Д. 21, Кв. 48",
+        "Йошкар-Ола, ул. Дружбы 99 кв. 69",
+        "Москва,ул Картмазовские Пруды,д.2,к.2,кв.251",
+        "Ржевский р-н д.Нестерово д.2",
+        "Республика Башкортостан Г Мелеуз улица Кочеткова дом 8",
+        "г. Барнаул ул. Молодёжная 136, 272",
+        "Республика Татарстан город Набережные Челны проспект Сююмбике дом 9/26 кв. 126",
+        "г. Магнитогорск, ул. Труда д.63 кв.2",
+        "Воронежская область, г. Нововоронеж, ул. Победы, д. 7, кВ. 257",
+        "МО, г. Котельники, ул. Новая д. 10, кв. 45",
+        "Челябинск, Цвиллинга 37, 10",
+        "Республика Марий Эл, Моркинский район, пгт Морки, ул. Лесная, д. 7, кв. 49",
+        "Ростовская обл. Тарасовский р-н, х. Рыновка, ул. Донская , д.3",
+        "Кемерово, ул.Верхотомская ул., 18",
+        "Московская обл, г. Видное, РП. Дрожжино, ш. Новое, д. 5, к. 1, кв. 119",
+        "г.Красноярск ул.Калинина 45и-11",
+        "Санкт-Петербург Проспект Народного Ополчения 10 кв. 715",
+        "Москва, ул. Фабрициуса 4, стр.1, 17",
+        "Воронежская область ,Каменский район,пгт.Каменка ул.Центральная,21",
+        "г. Краснодар НСТ «Садовод» ул. Банановая д. 295",
+        "РСО-Алания, г. Владикавказ, ул. Карла Маркса, д. 33",
+        "Московская область, город Жуковский, улица Гагарина, дом 64, кор. 2, кв. 13",
+        "М О Коломенский район, с. непецино, ул. Тимохина, 26-28",
+        "РСО-Алания, г. Владикавказ, пгт. Заводской, ул. Даркохская, 149",
+        "Челябинск ул.Цвиллинга 37, 10",
+        "г. Челябинск ул.Цвиллинга 37, 10",
+        "Брянская обл. г Дятьково ул Киевская д31 кв16",
+        "Свердловская область город Заречный улица 9 мая дом 6 квартира 24",
+        "Киров индустриальная 4а-12",
+        "Республика Башкортостан, г. Уфа, Ленинский район, ул. Ярмарочная д. 15, кв. 360",
+        "Волгоградская область г. Волжский пр-кт дружбы Д. 7 кВ 30",
+        "Западный обход 57к 1 кв 146 г Краснодар",
+        "г. Москва ул. Герасима Курина д16 кв167",
+        "г. Туймазы, ул. Островского, дом 43, кв. 5",
+        "Минеральные Воды улица горького д4 кв 47",
+        "Ул. Золотистая 68/2",
+        "Ибрагим-Отар. Дружбы д4",
+        "пос. Чернянка ул. Школьная д.2 кв4",
+        "ХМАО-Югра, г. Мегион, ул. Нефтяников 11а-12",
+        "Воронежская область г. Нововоронеж ул. Первомайская 21Б кв 7",
+        "Московская область, г. Химки. мик. Подрезково, ул. Игоря Жаринова, д. 6, кв. 5Москва",
+        "Московская область,  г. Химки. мик. Подрезково, ул. Игоря Жаринова, д. 6, кв. 5",
+        "Автоматчиков пер,д.14",
+        "Москва. Б-р Яна Райниса д19 к2 кв216",
+        "Москва, ул. Никитинская, дом 15, корп.2, кв.1",
+        "Город Электроугли Ногинский район Московская область Улица Березинская дом 4 квартира 73",
+        "МО, г Одинцово, ул Садовая 12 кв 73",
+        "403003, Волгоградская область, Городищенский район, р.п. Городище, ул. Зеленая, д.19",
+        "Город Выкса улица Нижнепрудная дом 3",
+        "московская обл., город Люберцы, улица Парковая, дом 3, кв.118",
+        "Москва. Чусовская 11к8 кв27",
+        "Москва Борисовские пруды 24/2",
+        "Приморский край, г. Арсеньев",
+        "Челябинск Дмитрия Неаполитанова 30-93",
+        "Волгоградская область г Волжский ул им ю.п Харламова д 4 КВ 75",
+        "Нижний Новгород, п Ляхово ул Моисеевой д.38",
+        "Г. Москва, Ул. Смольная, д. 57, к. 1, кв. 89",
+        "Московская область, г. Луховицы, ул. Островского, д. 5, кв. 59",
+        "Московская обл., г.о. Электросталь, г. Электросталь, Западная ул., д. 2в, кв. 93",
+        "Лобня Московская область ул Иванищенко д. 6 кв. 24кв. 24",
+        "Г. Зерноград, ул им Шукшина д.95, кв 60",
+        "Г. Новокузнецк пр. Ермакова д. 10 кв. 201",
+        "Московская область, г. Видное, д. Петрушино, ул. 3-я, д. 115а",
+        "Волгоградская обл., р-н Калачевский, п. Ильевка, ул. Донская, д. 168",
+        "Воронежская область г. Нововоронеж ул. Первомайская 21Б кв 7",
+        "Город Нововоронеж  улица Победы, 2 кВ 13",
+        "Волгоградская область, район Карачевский, поселок Ильевка, улица Донская, дом 168",
+        "Республика Башкортостан, город Стерлитамак, улица  Караная Муратова 1а-32",
+        "г. Москва, Алтуфьевское шоссе, д. 24В, кв. 144",
+        "Курская обл., г. Железногорск, пер. Алексеевский 2-й, Д.10",
+        "ул. Глинки, 54",
+        "г. Москва, ул. Яблочкова, д. 49, кв. 133",
+        "г. Самара, Стара Загора 147, кв.50",
+        "Челябинск, ул. Техникумовская д. 19 кв. 84",
+        "Королева 63к1, 331",
+        "с. Фролы, Весенняя, 38-35",
+        "Нижний Новгород, ул. Советской армии, д. 16, кв. 32",
+        "г Чебоксары, ул Строителей",
+        "Канашский район, с. Шихазаны, ул. Садовая, 29",
+        "Московская обл., г. Сергиев Посад, ул. Инженерная, д. 8, кв. 180",
+        "г Санкт-Петербург, пр.Просвещения 14/2 кв 80",
+        "г. Канаш, улица Московская, 8-8",
+        "Г.Котлас,ул.Лазо 18-2",
+        "Рязань, ул. Гоголя, д36, кв14",
+        "Г. Москва улица Вильнюсская дом 3 корп 1 кв 377",
+        "г.Рязань, ул.Щорса , д.35, к.2,кв.60",
+        "Краснодарский край, г. Сочи, Параллельная 9 лит 3 кв 44",
+        "Г.Москва Дмитровское шоссе 105-2-65",
+        "г. Самара, Стара Загора 147, кв.50",
+        "Татарстан с Лаишево ул Ленинская дом 10 кв 13",
+        "г Москва, Дмитровское шоссе, д 5 к 1, кв. 66",
+        "РЕСП ТАТАРСТАН, Г. НАБЕРЕЖНЫЕ ЧЕЛНЫ, ПР-КТ РАИСА БЕЛЯЕВА, Д. 90, КВ. 34",
+        "Волгоградская область, р-н Калачевский, Х. Светлый Лог, ул. Вишневая, двлд. 7",
+        "РЕСП КАБАРДИНО-БАЛКАРСКАЯ, Р-Н ТЕРСКИЙ, С. ТАМБОВСКОЕ, УЛ. ДРУЖБЫ, ДОМ 109",
+        "Российская Федерация, город Москва, вн.тер.г. муниципальный округ Коммунарка, поселок Коммунарка, улица Александры Монаховой, дом 84, корпус 2, квартира 324",
+        "МО, Люберецкий р-н, пгт Томилино, ул. Гоголя 54/2-201",
+        "Московская обл., г. одинцово, Можайское шоссе д.36, кв.12",
+        "Омск ул Лукашевича д. 27 корп.А кв.218.",
+        "Волгоградская область, город Волжский, ул. 40 лет Победы, дом 10, кв. 7",
+        "Красноярский край, г. Ужур, ул. Юности, 13-14",
+        "г. Новосибирск, ул. Сибирская, д. 13, кв. 18.",
+        "МОСКОВСКАЯ ОБЛ., ЛЕНИНСКИЙ Р-Н, Г. ВИДНОЕ, ПР-КТ ЛЕНИНСКОГО КОМСОМОЛА, Д.42, КВ.35",
+        "Зеленокумск, ул. Кашпарова, дом 33",
+        "Омск, ул. Дианова д.19, кв. 29",
+        "г.Кострома ул.Ново-Полянская д.5А кв.13",
+        "г. Бузулук Оренбургская область  ул. Шевченко дом 89 кВ 20",
+        "г Пермь, ул Целинная, д 57",
+        "Москва, пр-д Таможенный, д.10, кв.15",
+        "г. Санкт-Петербург, Центральный р-он, ул. Фурштатская,, д.47/11, кв. 43",
+        "446028, Самарская область, город Сызрань, проспект Космонавтов, дом 8, квартира 49",
+        "Г. Москва, г. Зеленоград, к.1626, КВ.331",
+        "ГОРОД МОСКВА УЛИЦА МУСЫ ДЖАЛИЛЯ Д.34, К. 2, КВ.65",
+        "125480, г Москва, р-н Северное Тушино, ул Героев Панфиловцев, д 11 к 1, кв 32",
+        "г Братск ул Енисейская дом 48 кв 48",
+        "Саранская д7кв 52",
+        "Уфа 50лет октября 7-38",
+        "ОБЛ. МОСКОВСКАЯ Р-Н РАМЕНСКИЙ П. РЕМЗАВОДА Д.1 КВ79",
+        "Самарская область, город Сызрань, ул. Победы 21, кв. 15",
+        "Московская область, г.о. Люберцы, пос. Мирный, ул. Академика Северина, д. 11/1, кв. 154",
+        "Москва, ул. Фабрициуса 4, стр. 1, кв. 17",
+        "г Усть Лабинск ул. Плеханова 49",
+        "Г. Москва г. Зеленоград, Панфиловский проспект, Корп. 922 кв. 69",
+        "г Пермь, ул Целинная, д 57",
+        "г. Москва, ул. Лодочная, дом 31, стр. 1, кв. 56",
+        "Брянская область Погарский район деревня Лукин улица Новая дом 11",
+        "Шафиева 12 кв26",
+        "Гор. Радужный, мкр 1-й, дом № 2, кв. 5",
+        "Московская область, г. Балашиха, мкр. Павлино, дом 11, кв. 61",
+        "Москва, Мясницкая 35А, кв35",
+        "Тверь Октябрьской пр. Дом 95,корпус 5, кв 147",
+        "Красногорск, Зверева 6-156",
+        "Московская обл, Люберцы пос. Малаховка Комсомольская 9к3",
+        "г Тюмень, ул Ю.-Р.Г.Эрвье, д 28, кв. 69",
+        "г. Волгоград, ул. Н. Отрады 24а-59",
+        "Алтайский край, Краснощековский район, с. Харлово, ул. Нагорная, д. 17",
+        "Г.Сызрань, Пр-кт. Гагарина, д. 63, кв. 28.",
+        "г Тюмень, ул Ю.-Р.Г.Эрвье, д 28, кв. 69",
+        "Г. Уфа, улица 50 лет СССР, дом 45/1 квартира 47Уфа",
+        "Г. Уфа, улица 50 лет СССР, дом 45/1 квартира 47",
+        "Россия, Кострома, 1-й Осторожный переулок, дом 20, кв.9 Кострома Костромская область 156025 RU",
+        "Самарская область, г. Сызрань, ул. Победы 21, кв. 15",
+        "Ростов-на-Дону, переулок Андреева дом 17 к 132",
+        "Чувашская республика, Чебоксары, пр-кт 9-ой пятилетки д 7/13, кв11",
+        "640002, ул Гоголя, д. 37, кв. 70",
+        "г. Ахтубинск,  ул. Микрорайон-1,  д.6, кв.62",
+        "Калининградская область, пос. Заостровье, ул. Старшего Лейтенанта Ильи Пуртова д1,  кв.44",
+        "г.Новосибирск, территория военного городка, 773-69",
+        "Иркутск д. Грановщина Косыгина 30а",
+        "Архангельская область, город Архангельск, улица Дрейера, дом 2, квартира 58",
+        "Г Архангельск, ул Самойло, 13, 406А",
+        "Город Тула улица маршала Жукова д.4 кВ.73",
+        "Г Сарапул",
+        "Город Тула улица маршала Жукова 4-73",
+        "Город Стерлитамак, улица Караная Муратова 1а-32",
+        "Московская обл., г.о. Люберцы, пгт. Малаховка, ул. Комсомольская д9к3",
+        "Республика Татарстан, Пестречинский район, с. Пестрецы, ул. Космонавтов, д. 48",
+        "Г. Бийск ул. Социалистическая 78-20",
+        "Ленинградская обл, Кировский р-н, г. Отрадное, ул. Гагарина, д. 6 кв. 111",
+        "Дер. Покровка ул железнодорожная д 10",
+        "Липецкая область Становлянский район п. Дружба д. 8кв.10",
+        "Город Калининград, ул. Б-р Южный, д. 3, КВ. 10",
+        "Москва, ул. Фабрициуса, 4, стр.1, кв.17",
+        "Г. Казань, улица Осиновская д. 32",
+        "Москва, Павелецкий 2-ой пр., д. 4, корп. 2, кв. 21",
+        "Г. Старый Оскол",
+        "Москва, Ш. Дмитровское Д.169 к.4, кв 277",
+        "Дмитровское шоссе 169к4",
+        "Г. Зерноград, ул. Им Шукшина д.95, кв.60",
+        "Город пермь улица Липатова 22 -20",
+        "гор. Яхрома Дмитровский р-н Московская обл. мкр-н Левобережье дом 14 кв 113",
+        "Новосибирск, ул. ПЕРМИТИНА, 5, кв 11",
+        "Самарская обл, г Самара, мкр Крутые Ключи, ул Мира, д 12, кв 36",
+        "г. Нижний Новгород Волжская наб. д. 10 кв. 471",
+        "ул. Вогульская, 31",
+        "Воронежская область г.Борисоглебск ул.Пушкинская д.86. к.12",
+        "Республика Татарстан, Тукаевский район, село Ильбухтино, улица Центральная, дом 36В",
+        "ВОРОНЕЖСКАЯ ОБЛ, ВОРОБЬЕВСКИЙ Р-Н, С.ЛЕЩАНОЕ, УЛ.ЖЕЛЕЗНОДОРОЖНАЯ, ДОМ 28",
+        "Республика Татарстан, Высокогорский район, поселок Дачное, улица Центральная, дом 26а, квартира 13",
+        "г. Курск ул. Серёгина 29 кв. 119",
+        "403003, Волгоградская область, Городищенский район, р.п. Городище, ул. Зеленая, д.19",
+        "г.Волгоград Волгоградская область р.п. Городище Городищенский район Зелёная 19",
+        "г. Санкт-Петербург, наб. реки Смоленки, д. 35, Корп. 1, лит. А, КВ. 72",
+        "г.Кострома ул.Костромская д.112 кор.1 кв.28",
+        "Ростовская обл, гор. Таганрог, ул. Пролетарская, д. 28",
+        "Ростовская обл, гор. Таганрог, ул. Пролетарская, д. 28в",
+        "Г. Старый Оскол М-н Восточный д 3 кв 95",
+        "Ростовская область, город Таганрог, ул. Пролетарская, д. 28В",
+        "Вологодская область, Шекснинский р-н, п Чебсара, ул Привокзальная д.6",
+        "г. Москва, 4-й Вятский пер., д. 22Б, кв.57",
+        "Ангелов пер 11-1-314",
+        "Липецкая область село Становое улица Мира д7 кв3",
+        "Г. Нефтекамск ул. Мустая Карима 4",
+        "Г. Уфа ул. Рихарда Зорге д.74 кВ 24",
+        "Ставропольский край, Нефтекумский район, г. Нефтекумск, м-н 2, д.12, кв.95",
+        "Санкт-Петербург Ипподромный переулок дом 1 корпус 2 квартира 380",
+        "Белгородская обл. Ракитянский р-н п. Ракитное ул. Кооперативная д. 27",
+        "Москва, Карельский бульвар д. 6, корп. 1, кв. 55",
+        "ул. Ленина 130,30",
+        "пос. Ракитное ул. Центральная д. 11",
+        "ЯНАО Пуровский район 4 мкр, 4 д., кв 11",
+        "Московская область, г-о Клин, дер. Гафидово 46",
+        "г.Кемерово, Восточный проспект 23, 121",
+        "Г. Ессентуки ул. Маркома 95",
+        "г. Майкоп пер.7-й д.1",
+        "ленина 74",
+        "Московская область, Одинцовский городской округ, посёлок Летний отдых, улица Зелёная, дом 12А, кв. 56",
+        "г Пермь, ул Петропавловская, д 91, кв. 86",
+        "Брянск ул Ульянова дом 123 кв 28",
+        "Уфа Бакалинская 66-25",
+        "Г. Уфа, улица 50 лет СССР, дом 45/1 квартира 47",
+        "УФА.БАКАЛИНСКАЯ 66-25",
+        "ОБЛ.ТАМБОВСКАЯ, Р-Н ТАМБОВСКИЙ, С.ДОНСКОЕ, УЛ.1-АЯ САДОВАЯ Д.35",
+        "Чебоксары проспект Тракторостроителей д. 16 кв.166",
+        "г. Кемерово ул. Николая Островского 28-15",
+        "Воронежская обл. Гор. Воронеж ул. Карла Маркса дом 74 кв. 25",
+        "Екатеринбург, ул. Атмосферная 11-144",
+        "г. Кемерово ул. Николая Островского 28-15",
+        "г. Москва, ул Суздальская,  д 42,  к2, кв 54",
+        "Московская область, г. Одинцово, ул. Северная, д. 5, корп. 4, кв. 119",
+        "143006 МО, г. Одинцово, ул. Маковского, д. 6, кв. 83",
+        "г. Омск, Заозерная, 11А, 25",
+        "Московская область, г.Подольск, ул. Циолковского, 3а-131",
+        "г. Москва, улица Абрамцевская д.9, к.1, кв.479",
+        "Московская обл., г. Химки, кв-л Клязьма, ул. Летчика Ивана Федорова, д. 3, к. 2, кв. 46",
+        "п. Никологоры пер.Красноармейский д.2 кв.7",
+        "Ул. Светлогорская д. 27 кв.93",
+        "УР, г. Ижевск, Толстого, 9-79",
+        "Г. Уфа, ул. Гафури 90, кв. 26",
+        "Удмуртская респ., г. Ижевск, ул.  Л. Толстого, 9-79",
+        "Московская область, г. Домодедово, мкр. Южный, ул. Южнодомодедовская, дом 11, кв. 220",
+        "г. Магнитогорск ул.Калмыкова 9 кВ 48",
+        "МО, г. Котельники, ул. Новая д. 10, кв. 45",
+        "курская обл золотухинский р-н п солнечный ул мира д3 кв 54",
+        "Г. Нальчик, ул. И. Идарова, д. 162, кв. 62",
+        "Россия, Кострома, 1-й Осторожный переулок, дом 20, кв.9",
+        "Липецкая область Чаплыгинский район село пиково улица малая центральная дом 4",
+        "Свердловская обл, город Серов, ул фуфачева 16 кв 45",
+        "Г. Москва улица Харьковская д, корп 1, кв 79",
+        "г. Смоленск Киевское шоссе д. 60 кв. 432",
+        "Курская обл, г. Железногорск. Детский пер 11 кв. 109",
+        "Курская обл, золотухинский р-он_ п. Солнечный ул. Мира д 3 кв 54",
+        "Оренбургская область, Оренбургский район п. Экспериментальный ул.2-я Молодежная, д.1 кв.1",
+        "с. Бокино Тамбов",
+        "г. Москва, б-рЯна Райниса, д.43, кв.12",
+        "Иркутская область, город Усолье-Сибирское, ул. Луначарского , д.45, кв. 122",
+        "г. Москва, ул. Бирюлевская, д. 47 к. 1, кв. 474",
+        "ул. Скульптора Мухиной дом 8 корп.2 кв.42Москва, Москва 119634",
+        "Воронежская область, г. Нововоронеж, ул. Космонавтов, д. 24, кв. 166",
+        "Московская область, г-о Клин, дер. Гафидово 46",
+        "Московская область",
+        "Тула, Карпова 98к2 кв 330",
+        "Тула, ул Карпова 98 к2 кв 330",
+        "Гор. Москва ул.Полбина д.8 кв.35",
+        "П. Медвенка Пер.Ватутина Д.4",
+        "улица Советская, 19",
+        "Ростов на Дону, извилистая д.13, КВ. 109",
+        "Г. ВИДНОЕ, УЛ. БЕРЕЗОВАЯ, Д.9, КВ. 669",
+        "Новосибирск, ул. ПЕРМИТИНА, 5, кв 11",
+        "Белгород, ул.50-летия Белгородской области, д2, кв1",
+        "Чувашская республика, гор. Чебоксары , Эгерский бульвар, д16 кв1",
+        "Краснодарский край г. Сочи ул. Гастелло 19 кв.69",
+        "г. Подольск, Московская обл., ул. Циолковского, д.17, кв.32",
+        "г.Казань, ул.Чистопольская, д. 16/15 кв 165",
+        "Чувашская Республика, гор. Алатырь, ул. Комиссариатская, дом 79, кв. 22",
+        "Свердловская область город Заречный улица 9 мая дом 6 квартира 24",
+        "г. Нижнекамск Школьный бульвар 8. кв. 8",
+        "г.Н.Новгород, ул. Владимирская, д. 25",
+        "Г. МОСКВА, УЛ. ГЖАТСКАЯ, Д.5, К.9, КВ.12",
+        "МОСКОВСКАЯ ОБЛ. Г. НОГИНСК УЛ. ГАРАЖНАЯ Д.1 КВ. 333",
+        "г. Брянск, ул. Почтовая, д.106, кв.48",
+        "Г. Нововоронеж ул. Победы д. 8 кв. 40",
+        "Г. Жуковский, ул.Федотова 3, кв. 26",
+        "Тюмень , ул. Комбинатская д.54, корпус 2, кв. 536",
+        "Новосибирская область, Краснозерский район, с.Аксениха, ул.Гагарина 23кв1",
+        "Г. Дубна московской области ул. Вокзальная д. 7, корпус 1, кв. 52",
+        "Смоленская область, р-н Сычевский, д. Сутормино, ул. Цыеточная, двлд. 6, кв.1.",
+        "Балаклавский проспект д.46А ка.57",
+        "Рязанская область р/п Сапожок  ул. Есенина д.50",
+        "г. Чебоксары, ул. Энтузиастов, д.34, кв. 1",
+        "г. Нижний Новгород Волжская наб. д. 10 кв. 471",
+        "г. Кемерово, ул. Глинки 5-94",
+        "г Москва, поселение Сосенское, пос. Коммунарка, ул. Бачуринская, д. 22, корп. 3, кв. 412",
+        "192283, Санкт-Петербург, Купчинская 25/11, 411",
+        "Г. Москва ул. Вильнюсская дом 3 корп. 1 кв. 377",
+        "117042 Москва, Чечерский 82-74",
+        "ВОЛГОГРАДСКАЯ ОБЛ., РУДНЯНСКИЙ Р-Н., Р.ПОС.РУДНЯ, УЛ.ПИОНЕРСКАЯ, ДОМ 59",
+        "Г. ЧЕРМОЗ УЛ. ЗАВОДСКАЯ Д. 7, КВ. 2",
+        "Москва, Красностуденческий проезд, дом 1,кв 125",
+        "Москва, ул. Фабрициуса 4, стр.1, 17",
+        "Нижегородская область г Саров ул Бессарабенко д 17 кв 26",
+        "Москва ул. Шипиловская 6к2 264",
+        "Нижний Новгород, п Ляхово ул Моисеевой д.38",
+        "Костромская обл. г. Кострома ул. Костромская д 89/1 кв. 47",
+        "г. Оренбург, ул. Конституции СССР 9, кв 49",
+        "Воронежская область город Нововоронеж ул Победы дом 8 квартира 40",
+        "Республика Башкортостан город Нефтекамск улица дорожная 21 корпус Б квартира 108",
+        "г. Москва, ул. Утренняя, д. 7, кв. 36",
+        "Москва, ул. Миллионная, д. 14. кв. 18",
+        "Тульская обл, Щекинский р-н, г Советск, Комсомольский пер, д 6",
+        "гор. Москва ул. Подольская д 9 кв 152",
+        "М.О. Раменский район, п. Кратово ул. Тверская д. 1 кв. 5",
+        "Омск, ул. 4-транспортная, 10, кв 9",
+        "Удмуртская Респ, г. Ижевск, ул. Максима Горького, д. 151, кв. 24",
+        "г. Великий Новгород, ул. Большая Санкт-Петербургская, д. 111, кв. 159",
+        "Лобня Московская область ул Иванищенко д. 6 кв. 24кв. 24",
+        "Удмуртская Респ, г. Ижевск, ул. Максима Горького, д. 151, кв. 24",
+        "г.Нижний Новгород, ул. Бекетова, 29-3",
+        "Москва, ул. Фабрициуса 4, стр.1, 17",
+        "Орловская обл.Покровский р-н с.Берёзовка ул.Заречная 4",
+        "Нижний Новгород, п Ляхово ул Моисеевой д.38",
+        "СВЕРДЛОВСКАЯ ОБЛ., Г. ВЕРХНЯЯ САЛДА , УЛ. ЭНГЕЛЬСА , Д. 81 К. 5, КВ. 12",
+        "Старовопольский край, Изобильненский район, город Изобильный, пер. Восточный д19",
+        "Свердловская область город Асбест посёлок Рефтинский улица Юбилейная 15-99",
+        "г. Москва, п. Коммунарка, мкр. Эдальго, д.7, кв. 234",
+        "Г. Москва, г. Зеленоград, к.1626, КВ.331",
+        "Самарская область, г.Тольятти, ул.Автостроителей 48 кв.40",
+        "гор. Москва ул. Подольская д 9 кв 152",
+        "Николая Островского 195/3",
+        "Г. Чапаевск ул. Октябрьская д. 14, кв. 11",
+        'Ростовская область, г. Батайск, ул.Заводская 229 "А"',
+        "Омск ул. 5 Северная 124 кв 21",
+        'Ростовская область,г Батайск,ул. Заводская 229 "А"',
+        "Г. Видное ул. Завидная д. 4 кв. 12",
+        "Самара, Средне-Садовая 54, кв 125",
+        "634062 г.Томск, ул.Герасименко 1/13 кв.118",
+        "Самара, Средне-Садовая 54, кв 125",
+        "Калининградская обл, Черняховский р-н, г. Черняховск, 2-й Дачный пер, д 14 кв 69",
+        "Город Чебоксары улица А.В.Асламаса дом 1 квартира 77",
+        "Московская область, г.Лобня, ул.Спортивная, д.3, кв.2",
+        "Москва, Вороновское поселение, поселок ЛМС, улица микрорайон Центральный,  дом 34, квартира 9",
+        "г. Москва, ул. Молостовых, д. 5, кв. 66",
+        "г Москва, поселение Сосенское, пос. Коммунарка, ул. Бачуринская, д. 22, корп. 3, кв. 412",
+        "г. Москва, 1-я Машиностроения, д. 10, кв. 6",
+        "Саратовская обл., Пугачёвский р-н, с. Старая Порубежка, ул. Плямункова, д. 8А",
+        "пос.Леспроект д.16 кв.2",
+        "г. Новосибирск ул. Шевченко 11-487",
+        "ОБЛ. ВОРОНЕЖСКАЯ Р-Н НИЖНЕДЕВИЦКИЙ С. НИЖНЕДЕВИЦК УЛ. СОЛНЕЧНАЯ Д. 14",
+        "Московская область, г. Одинцово, Можайское шоссе, д. 136, кв. 134",
+        "г Москва, поселение Сосенское, пос. Коммунарка, ул. Бачуринская, д. 22, корп. 3, кв. 412",
+        "Краснодар, улица им. Братьев Дроздовых, д. 41 кв 1",
+        "195297, г Санкт-Петербург, ул Тимуровская, д 26 к 2, кв 59",
+        "Тамбовская область, Бондарский район, с. Пахотный Угол, улица Карла Маркса, д. 86",
+        "Алтайский край, Краснощековский район, с. Харлово, ул. Нагорная, д. 17",
+        "г.Кириши Бульвар Молодёжный д.26 кв.3"
     ]
 
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
+    print(f"{'!' * 70}")
     for addr in test_addresses:
         parsed = parse_address(addr)
         print(f"{'─' * 70}")
         print(f"ВХОД:     {addr}")
-        if parsed['comment']:
-            print(f"СТАТУС:   {parsed['status']} | {parsed['comment']}")
-        else:
-            print(f"СТАТУС:   {parsed['status']}")
+        print(f"НОРМ:     {parsed['normalized']}")
         print(f"ИНДЕКС:   {parsed['postal_code']}")
-        print(f"РЕГИОН:   {parsed['region']}")
         print(f"ГОРОД:    {parsed['city']}")
         print(f"УЛИЦА:    {parsed['street']}")
         print(f"ДОМ:      {parsed['house']}")
         print(f"КОРПУС:   {parsed['building']}")
         print(f"КВАРТИРА: {parsed['apartment']}")
+        print(f"status: {parsed['status']}")
+        print(f"comment: {parsed['comment']}")
+        print(f"{'_' * 70}")
