@@ -74,6 +74,10 @@ def main():
         try:
             ref_df = pd.read_excel(payer_file_path)
             reference_dict = build_reference_dict(ref_df)
+            print('=== СОДЕРЖИМОЕ СЛОВАРЯ ===')
+            for k, v in reference_dict.items():
+                print(f'  {repr(k)} => {repr(v)}')
+            print(f'=== ВСЕГО КЛЮЧЕЙ: {len(reference_dict)} ===')
         except Exception as e:
             error('Не удалось загрузить справочник Payer BAN.\n\nПрограмма продолжит работу без справочника.')
     missing = [c for c in NEEDED_COLUMNS if c not in df.columns]
